@@ -1,12 +1,60 @@
+const textInputMapping = {
+	"name": "Pack Name",
+	"version": "Version",
+	"author": "Author",
+	"projectID": "Curse Project ID",
+	"overrides": "Overrides folder name"
+};
+
+let textInputElements = {};
+
+function handleString(input) {
+	const inputJSON = JSON.parse(input);
+	const editor = document.getElementById("editor");
+	editor.innerHTML = null;
+	const form = document.createElement("form");
+
+	Object.keys(textInputMapping).forEach((key) => {
+		let value = inputJSON[key];
+		if (value == null) {
+			throw new Error("Key " + key + " doesn't exist in manifest.");
+		}
+
+		let formGroup = document.createElement("div");
+		formGroup.setAttribute("class", "form-group row");
+
+		let label = document.createElement("label");
+		label.appendChild(document.createTextNode(textInputMapping[key]));
+		label.setAttribute("class", "col-sm-3 col-form-label");
+		label.setAttribute("for", key + "-input");
+		formGroup.appendChild(label);
+
+		let inputDiv = document.createElement("div");
+		inputDiv.setAttribute("class", "col-sm-9");
+		let input = document.createElement("input");
+		input.setAttribute("type", "text");
+		input.setAttribute("class", "form-control");
+		input.setAttribute("id", key + "-input");
+		input.value = value;
+		inputDiv.appendChild(input);
+		formGroup.appendChild(inputDiv);
+
+		form.appendChild(formGroup);
+
+		textInputElements[key] = input;
+	});
+
+	editor.appendChild(form);
+
+	//dropbox.classList.add("d-none");
+}
+
+/* Import files
+*/
+
 const errorElement = document.getElementById("error");
 function logImportError(message) {
 	errorElement.innerText = "Error while importing: " + message;
-}
-
-function handleString(input) {
-	console.log("Found " + input.length);
-
-	dropbox.classList.add("d-none");
 }
 
 // Read string data from file
@@ -14,8 +62,12 @@ function handleFile(file) {
 	let reader = new FileReader();
 
     reader.onload = function(e) {
-        let text = reader.result;
-        handleString(text);
+		let text = reader.result;
+		try {
+			handleString(text);
+		} catch (e) {
+			logImportError(e.message);
+		}
 	};
 	
 	reader.onerror = function(e) {
