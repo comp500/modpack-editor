@@ -1,3 +1,5 @@
+const errorElement = document.getElementById("error");
+
 const textInputMapping = {
 	"name": "Pack Name",
 	"version": "Version",
@@ -45,6 +47,7 @@ function handleString(input) {
 	});
 
 	editor.appendChild(form);
+	errorElement.innerHTML = "";
 
 	//dropbox.classList.add("d-none");
 }
@@ -52,7 +55,6 @@ function handleString(input) {
 /* Import files
 */
 
-const errorElement = document.getElementById("error");
 function logImportError(message) {
 	errorElement.innerText = "Error while importing: " + message;
 }
