@@ -37,6 +37,7 @@ function handleString(input) {
 
 	const editor = document.getElementById("editor");
 	hyperHTML.bind(editor)`
+	<h3>Edit modpack</h3>
 	<form>
 		${
 			Object.keys(textInputMapping).map((key) => {

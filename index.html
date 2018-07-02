@@ -15,7 +15,7 @@
 
 		#importArea {
 			transition: opacity 0.5s, background-color 0.5s;
-			padding: 1em;
+			padding-bottom: 0.5em;
 		}
 
 		.dragging {
@@ -42,15 +42,16 @@
 		<section id="importArea">
 			<h3>Import manifest.json</h3>
 			<p id="error" class="text-danger"></p>
-			Drag file here or <input type="file" id="importFile"><br>
+			Drag file here or <input type="file" id="importFile" class="form-control-file"><br>
 			<textarea placeholder="or type here" id="importText"></textarea>
-			<button id="importButton">Submit</button>
+			<button id="importButton" class="btn btn-outline-primary">Submit</button>
 		</section>
 
 		<section id="editor">
 		</section>
 
 		<section id="output" class="d-none">
+			<h3>Output</h3>
 			<textarea placeholder="Output will appear here" id="exportText"></textarea>
 		</section>
 	</div>
