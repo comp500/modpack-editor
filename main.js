@@ -133,7 +133,7 @@ function renderForm() {
 
 				return hyperHTML.wire(currentData, ":modLoaders")`
 				<div class="form-group row">
-					<label class="col-sm-3 col-form-label" for="mcVersion-input">Modloader(s)</label>
+					<label class="col-sm-3 col-form-label" for="mcVersion-input">Modloader ID(s) (e.g. forge-14.23.4.2715)</label>
 					<div class="col-sm-9">
 						<input type="text" class="form-control" id="mcVersion-input" value="${valueConverted}" oninput="${modLoaderInputHandler}">
 					</div>
