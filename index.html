@@ -28,6 +28,10 @@
 			margin: 0.3em;
 			font-family: monospace;
 		}
+
+		#exportText {
+			height: 25em;
+		}
 	</style>
 </head>
 
@@ -45,8 +49,13 @@
 
 		<section id="editor">
 		</section>
+
+		<section id="output" class="d-none">
+			<textarea placeholder="Output will appear here" id="exportText"></textarea>
+		</section>
 	</div>
 
+	<script src="https://unpkg.com/hyperhtml@latest/min.js"></script>
 	<script src="main.js"></script>
 </body>
 </html>

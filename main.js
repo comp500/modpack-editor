@@ -8,45 +8,60 @@ const textInputMapping = {
 	"overrides": "Overrides folder name"
 };
 
-let textInputElements = {};
+let currentData;
+
+function updateOutput() {
+	const exportText = document.getElementById("exportText");
+	exportText.value = JSON.stringify(currentData, null, 2);
+}
 
 function handleString(input) {
-	const inputJSON = JSON.parse(input);
+	currentData = JSON.parse(input);
+	let inputHandler = key => {
+		return (e) => {
+			currentData[key] = e.target.value;
+			updateOutput();
+		};
+	};
+
+	let numberInputHandler = key => {
+		return (e) => {
+			currentData[key] = parseInt(e.target.value);
+			updateOutput();
+		};
+	};
+
+	const output = document.getElementById("output");
+	output.classList.remove("d-none");
+	updateOutput();
+
 	const editor = document.getElementById("editor");
-	editor.innerHTML = null;
-	const form = document.createElement("form");
+	hyperHTML.bind(editor)`
+	<form>
+		${
+			Object.keys(textInputMapping).map((key) => {
+				let value = currentData[key];
+				if (value == null) {
+					throw new Error("Key " + key + " doesn't exist in manifest.");
+				}
 
-	Object.keys(textInputMapping).forEach((key) => {
-		let value = inputJSON[key];
-		if (value == null) {
-			throw new Error("Key " + key + " doesn't exist in manifest.");
+				let handler = inputHandler(key);
+				if (isFinite(value)) { // Is it a number?
+					handler = numberInputHandler(key);
+				}
+
+				return hyperHTML.wire(textInputMapping, ":" + key)`
+				<div class="form-group row">
+					<label class="col-sm-3 col-form-label" for="${key + "-input"}">${textInputMapping[key]}</label>
+					<div class="col-sm-9">
+						<input type="text" class="form-control" id="${key + "-input"}" value="${value}" oninput="${handler}">
+					</div>
+				</div>`;
+			})
 		}
+	</form>
+	`;
 
-		let formGroup = document.createElement("div");
-		formGroup.setAttribute("class", "form-group row");
-
-		let label = document.createElement("label");
-		label.appendChild(document.createTextNode(textInputMapping[key]));
-		label.setAttribute("class", "col-sm-3 col-form-label");
-		label.setAttribute("for", key + "-input");
-		formGroup.appendChild(label);
-
-		let inputDiv = document.createElement("div");
-		inputDiv.setAttribute("class", "col-sm-9");
-		let input = document.createElement("input");
-		input.setAttribute("type", "text");
-		input.setAttribute("class", "form-control");
-		input.setAttribute("id", key + "-input");
-		input.value = value;
-		inputDiv.appendChild(input);
-		formGroup.appendChild(inputDiv);
-
-		form.appendChild(formGroup);
-
-		textInputElements[key] = input;
-	});
-
-	editor.appendChild(form);
 	errorElement.innerHTML = "";
 
 	//dropbox.classList.add("d-none");
@@ -57,6 +72,7 @@ function handleString(input) {
 
 function logImportError(message) {
 	errorElement.innerText = "Error while importing: " + message;
+	console.error(message);
 }
 
 // Read string data from file
