@@ -8,6 +8,21 @@ const textInputMapping = {
 	"overrides": "Overrides folder name"
 };
 
+const blankTemplate = {
+    "minecraft": {
+        "version": "",
+        "modLoaders": []
+    },
+    "manifestType": "minecraftModpack",
+    "manifestVersion": 1,
+    "name": "",
+    "version": "",
+    "author": "",
+    "projectID": 0,
+    "files": [],
+    "overrides": "overrides"
+};
+
 let currentData;
 
 function updateOutput() {
@@ -15,20 +30,41 @@ function updateOutput() {
 	exportText.value = JSON.stringify(currentData, null, 2);
 }
 
-function handleString(input) {
-	currentData = JSON.parse(input);
+function renderForm() {
 	let inputHandler = key => {
-		return (e) => {
+		return e => {
 			currentData[key] = e.target.value;
 			updateOutput();
 		};
 	};
 
 	let numberInputHandler = key => {
-		return (e) => {
+		return e => {
 			currentData[key] = parseInt(e.target.value);
 			updateOutput();
 		};
+	};
+
+	let mcVersionInputHandler = e => {
+		currentData.minecraft.version = e.target.value;
+		updateOutput();
+	};
+
+	let modLoaderInputHandler = e => {
+		let isFirst = true;
+		currentData.minecraft.modLoaders = e.target.value.split(",").map(modLoader => {
+			if (isFirst) {
+				isFirst = false;
+				return {
+					id: modLoader.trim(),
+					primary: true
+				};
+			}
+			return {
+				id: modLoader.trim()
+			};
+		});
+		updateOutput();
 	};
 
 	const output = document.getElementById("output");
@@ -47,11 +83,11 @@ function handleString(input) {
 				}
 
 				let handler = inputHandler(key);
-				if (isFinite(value)) { // Is it a number?
+				if (value.length > 0 && isFinite(value)) { // Is it a number?
 					handler = numberInputHandler(key);
 				}
 
-				return hyperHTML.wire(textInputMapping, ":" + key)`
+				return hyperHTML.wire(currentData, ":" + key)`
 				<div class="form-group row">
 					<label class="col-sm-3 col-form-label" for="${key + "-input"}">${textInputMapping[key]}</label>
 					<div class="col-sm-9">
@@ -59,6 +95,50 @@ function handleString(input) {
 					</div>
 				</div>`;
 			})
+		}
+		${
+			(() => {
+				let value = currentData.minecraft.version;
+				if (value == null) {
+					throw new Error("Minecraft version doesn't exist in manifest.");
+				}
+
+				return hyperHTML.wire(currentData, ":mcVersion")`
+				<div class="form-group row">
+					<label class="col-sm-3 col-form-label" for="mcVersion-input">Minecraft version</label>
+					<div class="col-sm-9">
+						<input type="text" class="form-control" id="mcVersion-input" value="${value}" oninput="${mcVersionInputHandler}">
+					</div>
+				</div>`;
+			})()
+		}
+		${
+			(() => {
+				let value = currentData.minecraft.modLoaders;
+				if (value == null) {
+					throw new Error("Modloaders list doesn't exist in manifest.");
+				}
+
+				value.sort((a, b) => {
+					// Put the primary value first
+					if (a.primary && !b.primary) {
+						return -1;
+					}
+					if (!a.primary && b.primary) {
+						return 1;
+					}
+					return 0;
+				});
+				let valueConverted = value.map(a => a.id).join(",");
+
+				return hyperHTML.wire(currentData, ":modLoaders")`
+				<div class="form-group row">
+					<label class="col-sm-3 col-form-label" for="mcVersion-input">Modloader(s)</label>
+					<div class="col-sm-9">
+						<input type="text" class="form-control" id="mcVersion-input" value="${valueConverted}" oninput="${modLoaderInputHandler}">
+					</div>
+				</div>`;
+			})()
 		}
 	</form>
 	`;
@@ -68,8 +148,10 @@ function handleString(input) {
 	//dropbox.classList.add("d-none");
 }
 
-/* Import files
-*/
+function handleString(input) {
+	currentData = JSON.parse(input);
+	renderForm();
+}
 
 function logImportError(message) {
 	errorElement.innerText = "Error while importing: " + message;
@@ -151,6 +233,17 @@ submitButtonElement.addEventListener("click", () => {
 		} else {
 			logImportError("Manifest.json text cannot be empty! Please type something in.");
 		}
+	} catch (e) {
+		logImportError(e.message);
+	}
+}, false);
+
+// Creation from blank
+const newButtonElement = document.getElementById("newButton");
+newButtonElement.addEventListener("click", () => {
+	try {
+		currentData = blankTemplate;
+		renderForm();
 	} catch (e) {
 		logImportError(e.message);
 	}
