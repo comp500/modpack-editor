@@ -50,6 +50,7 @@ function renderForm() {
 		updateOutput();
 	};
 
+	// Split list into objects, with primary modLoader first
 	let modLoaderInputHandler = e => {
 		let isFirst = true;
 		currentData.minecraft.modLoaders = e.target.value.split(",").map(modLoader => {
@@ -82,9 +83,11 @@ function renderForm() {
 					throw new Error("Key " + key + " doesn't exist in manifest.");
 				}
 
-				let handler = inputHandler(key);
-				if (value.length > 0 && isFinite(value)) { // Is it a number?
+				let handler;
+				if (Number.isInteger(value)) { // Is it a number?
 					handler = numberInputHandler(key);
+				} else {
+					handler = inputHandler(key);
 				}
 
 				return hyperHTML.wire(currentData, ":" + key)`
