@@ -242,7 +242,7 @@ submitButtonElement.addEventListener("click", () => {
 const newButtonElement = document.getElementById("newButton");
 newButtonElement.addEventListener("click", () => {
 	try {
-		currentData = blankTemplate;
+		currentData = Object.assign({}, blankTemplate);
 		renderForm();
 	} catch (e) {
 		logImportError(e.message);
