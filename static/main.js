@@ -196,3 +196,20 @@ newModpackButtonElement.addEventListener("click", () => {
 		logOpenError(error);
 	});
 }, false);
+
+// Load current modpack
+fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(function(data) {
+	if (data.ErrorMessage) {
+		logOpenError(data.ErrorMessage);
+		return;
+	}
+	if (data.Modpack == null) { // No modpack loaded yet
+		return;
+	}
+	showOpenSuccess(false);
+	modpackLocationInput.value = data.Modpack.Folder;
+	currentData = data.Modpack.CurseManifest;
+	renderForm();
+}).catch(function(error) {
+	logOpenError(error);
+});
