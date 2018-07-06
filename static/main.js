@@ -23,29 +23,21 @@ const blankTemplate = {
 
 let currentData;
 
-function updateOutput() {
-	const exportText = document.getElementById("exportText");
-	exportText.value = JSON.stringify(currentData, null, 2);
-}
-
 function renderForm() {
 	let inputHandler = key => {
 		return e => {
 			currentData[key] = e.target.value;
-			updateOutput();
 		};
 	};
 
 	let numberInputHandler = key => {
 		return e => {
 			currentData[key] = parseInt(e.target.value);
-			updateOutput();
 		};
 	};
 
 	let mcVersionInputHandler = e => {
 		currentData.minecraft.version = e.target.value;
-		updateOutput();
 	};
 
 	// Split list into objects, with primary modLoader first
@@ -63,12 +55,7 @@ function renderForm() {
 				id: modLoader.trim()
 			};
 		});
-		updateOutput();
 	};
-
-	const output = document.getElementById("output");
-	output.classList.remove("d-none");
-	updateOutput();
 
 	const editor = document.getElementById("editor");
 	hyperHTML.bind(editor)`
@@ -143,10 +130,6 @@ function renderForm() {
 		}
 	</form>
 	`;
-
-	errorElement.innerHTML = "";
-
-	//dropbox.classList.add("d-none");
 }
 
 function handleString(input) {
@@ -184,7 +167,8 @@ openModpackButtonElement.addEventListener("click", () => {
 			return;
 		}
 		showOpenSuccess(false);
-		console.log("Request succeeded with JSON response", data);
+		currentData = data.Modpack.CurseManifest;
+		renderForm();
 	}).catch(function(error) {
 		logOpenError(error);
 	});
@@ -206,7 +190,8 @@ newModpackButtonElement.addEventListener("click", () => {
 			return;
 		}
 		showOpenSuccess(true);
-		console.log("Request succeeded with JSON response", data);
+		currentData = data.Modpack.CurseManifest;
+		renderForm();
 	}).catch(function(error) {
 		logOpenError(error);
 	});
