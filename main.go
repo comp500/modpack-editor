@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -64,20 +63,6 @@ func main() {
 	}
 }
 
-// Modpack is a modpack being edited by modpack-editor
-type Modpack struct {
-	Folder string
-}
-
-func (m *Modpack) loadConfigFiles() error {
-	manifest, err := ioutil.ReadFile(m.Folder + "manifest.json")
-	if err != nil {
-		return err
-	}
-	log.Print(manifest)
-	return nil
-}
-
 func loadModpackFolder(w http.ResponseWriter, folder string) {
 	folderAbsolute, err := filepath.Abs(folder)
 	if err != nil {
@@ -85,25 +70,35 @@ func loadModpackFolder(w http.ResponseWriter, folder string) {
 		return
 	}
 
-	modpack = Modpack{folderAbsolute}
+	modpack = Modpack{Folder: folderAbsolute}
 	err = modpack.loadConfigFiles()
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+
+	// Send the modpack to the client
+	json.NewEncoder(w).Encode(struct {
+		Modpack Modpack
+	}{modpack})
 }
 
 func getCurrentPackDetails(w io.Writer) {
 	if modpack.Folder == "" { // Empty modpack
 		json.NewEncoder(w).Encode(struct {
-			Modpack []byte `json:"modpack"`
+			Modpack []byte
 		}{nil})
+	} else {
+		// Send the modpack to the client
+		json.NewEncoder(w).Encode(struct {
+			Modpack Modpack
+		}{modpack})
 	}
 }
 
 func writeError(w http.ResponseWriter, e error) {
 	w.WriteHeader(400)
 	json.NewEncoder(w).Encode(struct {
-		ErrorMessage string `json:"error"`
+		ErrorMessage string
 	}{e.Error()})
 }
