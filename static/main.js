@@ -1,5 +1,3 @@
-const errorElement = document.getElementById("error");
-
 const textInputMapping = {
 	"name": "Pack Name",
 	"version": "Version",
@@ -156,98 +154,60 @@ function handleString(input) {
 	renderForm();
 }
 
-function logImportError(message) {
-	errorElement.innerText = "Error while importing: " + message;
+const openMessagesElement = document.getElementById("openMessages");
+
+function logOpenError(message) {
+	openMessagesElement.innerText = "Error while opening: " + message;
+	openMessagesElement.className = "text-danger";
 	console.error(message);
 }
 
-// Read string data from file
-function handleFile(file) {
-	let reader = new FileReader();
-
-    reader.onload = function(e) {
-		let text = reader.result;
-		try {
-			handleString(text);
-		} catch (e) {
-			logImportError(e.message);
-		}
-	};
-	
-	reader.onerror = function(e) {
-		logImportError(reader.error.message);
-	}
-
-    // Read the manifest file as text
-	reader.readAsText(file);
+function showOpenSuccess(isCreated) {
+	openMessagesElement.innerText = isCreated ? "Successfully created modpack!" : "Successfully opened modpack!";
+	openMessagesElement.className = "text-success";
 }
 
-// Drop area
-const dropbox = document.getElementById("importArea");
-dropbox.addEventListener("dragenter", (e) => {
-	e.stopPropagation();
-	e.preventDefault();
-	dropbox.classList.add("dragging");
-}, false);
-dropbox.addEventListener("dragleave", (e) => {
-	e.stopPropagation();
-	e.preventDefault();
-	dropbox.classList.remove("dragging");
-}, false);
-dropbox.addEventListener("dragover", (e) => {
-	e.stopPropagation();
-	e.preventDefault();
-	dropbox.classList.add("dragging");
-}, false);
-dropbox.addEventListener("drop", (e) => {
-	e.stopPropagation();
-	e.preventDefault();
-
-	dropbox.classList.remove("dragging");
-
-	try {
-		let dt = e.dataTransfer;
-		let files = dt.files;
-		handleFile(files[0]);
-	} catch (e) {
-		logImportError(e.message);
-	}
-}, false);
-
-// File input
-const fileInputElement = document.getElementById("importFile");
-fileInputElement.addEventListener("change", () => {
-	try {
-		let selectedFile = fileInputElement.files[0];
-		handleFile(selectedFile);
-	} catch (e) {
-		logImportError(e.message);
-	}
-}, false);
-
-// Text input
-const textAreaElement = document.getElementById("importText");
-const submitButtonElement = document.getElementById("importButton");
-submitButtonElement.addEventListener("click", () => {
-	try {
-		let data = textAreaElement.value;
-		if (data.trim().length > 0) {
-			handleString(data);
-		} else {
-			logImportError("Manifest.json text cannot be empty! Please type something in.");
+const modpackLocationInput = document.getElementById("modpackLocation");
+const openModpackButtonElement = document.getElementById("openModpackButton");
+openModpackButtonElement.addEventListener("click", () => {
+	fetch("/ajax/loadModpackFolder", {
+		method: "post",
+		headers: {
+			"Content-type": "application/json; charset=UTF-8"
+		},
+		body: JSON.stringify({
+			"Folder": modpackLocationInput.value
+		})
+	}).then(response => response.json()).then(function(data) {
+		if (data.ErrorMessage) {
+			logOpenError(data.ErrorMessage);
+			return;
 		}
-	} catch (e) {
-		logImportError(e.message);
-	}
+		showOpenSuccess(false);
+		console.log("Request succeeded with JSON response", data);
+	}).catch(function(error) {
+		logOpenError(error);
+	});
 }, false);
 
-// Creation from blank
-const newButtonElement = document.getElementById("newButton");
-newButtonElement.addEventListener("click", () => {
-	try {
-		data = JSON.stringify(blankTemplate);
-		handleString(data);
-	} catch (e) {
-		logImportError(e.message);
-	}
+const newModpackButtonElement = document.getElementById("newModpackButton");
+newModpackButtonElement.addEventListener("click", () => {
+	fetch("/ajax/createModpackFolder", {
+		method: "post",
+		headers: {
+			"Content-type": "application/json; charset=UTF-8"
+		},
+		body: JSON.stringify({
+			"Folder": modpackLocationInput.value
+		})
+	}).then(response => response.json()).then(function(data) {
+		if (data.ErrorMessage) {
+			logOpenError(data.ErrorMessage);
+			return;
+		}
+		showOpenSuccess(true);
+		console.log("Request succeeded with JSON response", data);
+	}).catch(function(error) {
+		logOpenError(error);
+	});
 }, false);

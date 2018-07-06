@@ -1,0 +1,14 @@
+{
+    "minecraft": {
+        "version": "",
+        "modLoaders": []
+    },
+    "manifestType": "minecraftModpack",
+    "manifestVersion": 1,
+    "name": "",
+    "version": "",
+    "author": "",
+    "projectID": 0,
+    "files": [],
+    "overrides": "overrides"
+}
