@@ -137,11 +137,13 @@ function renderForm() {
 				logOpenError(data.ErrorMessage);
 				return;
 			}
-			return currentData.files.map(modData => {
-				let modID = modData.projectID;
-				return hyperHTML.wire()
-				`
-				<p>${data[modID].Name}</p>
+			return currentData.files.sort((a, b) => {
+				return data[a.projectID].Name.localeCompare(data[b.projectID].Name);
+			}).map(currentMod => {
+				let currentData = data[currentMod.projectID];
+				let iconURL = currentData.IconURL ? currentData.IconURL : "/MissingTexture.png";
+				return hyperHTML.wire()`
+				<p><img src="${iconURL}" class="img-thumbnail modIcon"> ${currentData.Name}</p>
 				`;
 			})
 		}).catch(function(error) {

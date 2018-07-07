@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/gobuffalo/packr"
@@ -176,8 +177,11 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 
 			var iconURL string
 			// Loop through attachments, set iconURL to last one
+			// Replace size in url (256/256) to 62/62
 			for _, v := range data.Attachments {
-				iconURL = v.URL
+				iconURL = strings.Replace(v.ThumbnailURL, "256/256", "62/62", 1)
+				// Curseforge does this for gifs for some reason...
+				iconURL = strings.Replace(iconURL, ".gif", "_animated.gif", 1)
 			}
 
 			mutex.Lock()
