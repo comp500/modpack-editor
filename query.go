@@ -153,7 +153,11 @@ func requestAddonData(addonID int) (AddonData, error) {
 type ModpackEditorCache struct {
 	CachedMods        map[int]AddonData
 	LastOpenedModpack string
+	CacheVersion      int
 }
+
+// CurrentCacheVersion is the version of the editor cache file being used. Older caches are ignored.
+const CurrentCacheVersion = 2
 
 func loadEditorCache() {
 	if disableCacheStore {
@@ -176,6 +180,12 @@ func loadEditorCache() {
 		if err != nil && err != io.EOF {
 			log.Print("Error loading from cache:")
 			log.Print(err)
+			cachedMods = make(map[int]AddonData)
+			return
+		}
+
+		if modpackEditorCache.CacheVersion < CurrentCacheVersion {
+			log.Print("Cache is too old, discarding")
 			cachedMods = make(map[int]AddonData)
 			return
 		}
@@ -223,6 +233,7 @@ func writeEditorCache() {
 	modpackEditorCache := ModpackEditorCache{
 		CachedMods:        cachedMods,
 		LastOpenedModpack: modpack.Folder,
+		CacheVersion:      CurrentCacheVersion,
 	}
 	zw := gzip.NewWriter(file)
 	defer zw.Close()
