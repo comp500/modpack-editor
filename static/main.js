@@ -57,79 +57,79 @@ function renderForm() {
 		});
 	};
 
-	const editor = document.getElementById("editor");
-	hyperHTML.bind(editor)`
-	<h3>Edit modpack</h3>
-	<form>
-		${
-			Object.keys(textInputMapping).map((key) => {
-				let value = currentData[key];
-				if (value == null) {
-					throw new Error("Key " + key + " doesn't exist in manifest.");
+	const generalSettings = document.getElementById("generalSettings");
+	hyperHTML.bind(generalSettings)`
+	${
+		Object.keys(textInputMapping).map((key) => {
+			let value = currentData[key];
+			if (value == null) {
+				throw new Error("Key " + key + " doesn't exist in manifest.");
+			}
+
+			let handler;
+			if (Number.isInteger(value)) { // Is it a number?
+				handler = numberInputHandler(key);
+			} else {
+				handler = inputHandler(key);
+			}
+
+			return hyperHTML.wire(currentData, ":" + key)`
+			<div class="form-group row">
+				<label class="col-sm-3 col-form-label" for="${key + "-input"}">${textInputMapping[key]}</label>
+				<div class="col-sm-9">
+					<input type="text" class="form-control" id="${key + "-input"}" value="${value}" oninput="${handler}">
+				</div>
+			</div>`;
+		})
+	}
+	${
+		(() => {
+			let value = currentData.minecraft.version;
+			if (value == null) {
+				throw new Error("Minecraft version doesn't exist in manifest.");
+			}
+
+			return hyperHTML.wire(currentData, ":mcVersion")`
+			<div class="form-group row">
+				<label class="col-sm-3 col-form-label" for="mcVersion-input">Minecraft version</label>
+				<div class="col-sm-9">
+					<input type="text" class="form-control" id="mcVersion-input" value="${value}" oninput="${mcVersionInputHandler}">
+				</div>
+			</div>`;
+		})()
+	}
+	${
+		(() => {
+			let value = currentData.minecraft.modLoaders;
+			if (value == null) {
+				throw new Error("Modloaders list doesn't exist in manifest.");
+			}
+
+			value.sort((a, b) => {
+				// Put the primary value first
+				if (a.primary && !b.primary) {
+					return -1;
 				}
-
-				let handler;
-				if (Number.isInteger(value)) { // Is it a number?
-					handler = numberInputHandler(key);
-				} else {
-					handler = inputHandler(key);
+				if (!a.primary && b.primary) {
+					return 1;
 				}
+				return 0;
+			});
+			let valueConverted = value.map(a => a.id).join(",");
 
-				return hyperHTML.wire(currentData, ":" + key)`
-				<div class="form-group row">
-					<label class="col-sm-3 col-form-label" for="${key + "-input"}">${textInputMapping[key]}</label>
-					<div class="col-sm-9">
-						<input type="text" class="form-control" id="${key + "-input"}" value="${value}" oninput="${handler}">
-					</div>
-				</div>`;
-			})
-		}
-		${
-			(() => {
-				let value = currentData.minecraft.version;
-				if (value == null) {
-					throw new Error("Minecraft version doesn't exist in manifest.");
-				}
-
-				return hyperHTML.wire(currentData, ":mcVersion")`
-				<div class="form-group row">
-					<label class="col-sm-3 col-form-label" for="mcVersion-input">Minecraft version</label>
-					<div class="col-sm-9">
-						<input type="text" class="form-control" id="mcVersion-input" value="${value}" oninput="${mcVersionInputHandler}">
-					</div>
-				</div>`;
-			})()
-		}
-		${
-			(() => {
-				let value = currentData.minecraft.modLoaders;
-				if (value == null) {
-					throw new Error("Modloaders list doesn't exist in manifest.");
-				}
-
-				value.sort((a, b) => {
-					// Put the primary value first
-					if (a.primary && !b.primary) {
-						return -1;
-					}
-					if (!a.primary && b.primary) {
-						return 1;
-					}
-					return 0;
-				});
-				let valueConverted = value.map(a => a.id).join(",");
-
-				return hyperHTML.wire(currentData, ":modLoaders")`
-				<div class="form-group row">
-					<label class="col-sm-3 col-form-label" for="mcVersion-input">Modloader ID(s) (e.g. forge-14.23.4.2715)</label>
-					<div class="col-sm-9">
-						<input type="text" class="form-control" id="mcVersion-input" value="${valueConverted}" oninput="${modLoaderInputHandler}">
-					</div>
-				</div>`;
-			})()
-		}
-	</form>
+			return hyperHTML.wire(currentData, ":modLoaders")`
+			<div class="form-group row">
+				<label class="col-sm-3 col-form-label" for="mcVersion-input">Modloader ID(s) (e.g. forge-14.23.4.2715)</label>
+				<div class="col-sm-9">
+					<input type="text" class="form-control" id="mcVersion-input" value="${valueConverted}" oninput="${modLoaderInputHandler}">
+				</div>
+			</div>`;
+		})()
+	}
 	`;
+
+	const editor = document.getElementById("editor");
+	editor.classList.remove("d-none");
 }
 
 function handleString(input) {
@@ -150,6 +150,7 @@ function showOpenSuccess(isCreated) {
 	openMessagesElement.className = "text-success";
 }
 
+// Modpack opening UI
 const modpackLocationInput = document.getElementById("modpackLocation");
 const openModpackButtonElement = document.getElementById("openModpackButton");
 openModpackButtonElement.addEventListener("click", () => {
@@ -213,3 +214,39 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 }).catch(function(error) {
 	logOpenError(error);
 });
+
+// Tabbed UI
+((document) => {
+	const generalSettings = document.getElementById("generalSettings");
+	const modList = document.getElementById("modList");
+	const addNewMods = document.getElementById("addNewMods");
+
+	const generalSettingsLink = document.getElementById("generalSettingsLink");
+	const modListLink = document.getElementById("modListLink");
+	const addNewModsLink = document.getElementById("addNewModsLink");
+
+	generalSettingsLink.addEventListener("click", () => {
+		generalSettings.classList.remove("d-none");
+		modList.classList.add("d-none");
+		addNewMods.classList.add("d-none");
+		generalSettingsLink.classList.add("active");
+		modListLink.classList.remove("active");
+		addNewModsLink.classList.remove("active");
+	}, false);
+	modListLink.addEventListener("click", () => {
+		generalSettings.classList.add("d-none");
+		modList.classList.remove("d-none");
+		addNewMods.classList.add("d-none");
+		generalSettingsLink.classList.remove("active");
+		modListLink.classList.add("active");
+		addNewModsLink.classList.remove("active");
+	}, false);
+	addNewModsLink.addEventListener("click", () => {
+		generalSettings.classList.add("d-none");
+		modList.classList.add("d-none");
+		addNewMods.classList.remove("d-none");
+		generalSettingsLink.classList.remove("active");
+		modListLink.classList.remove("active");
+		addNewModsLink.classList.add("active");
+	}, false);
+})(document);

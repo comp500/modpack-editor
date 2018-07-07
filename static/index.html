@@ -16,6 +16,10 @@
 		#openModpack {
 			padding-bottom: 0.5em;
 		}
+
+		.nav {
+			padding: 1em 0;
+		}
 	</style>
 </head>
 
@@ -31,7 +35,28 @@
 			<button id="newModpackButton" class="btn btn-outline-secondary">Create new from scratch</button>
 		</section>
 
-		<section id="editor">
+		<section id="editor" class="d-none">
+			<h3>Edit modpack</h3>
+			<ul class="nav nav-pills nav-fill">
+				<li class="nav-item">
+					<a class="nav-link active" href="#" id="generalSettingsLink">General</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="#" id="modListLink">Mod list</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="#" id="addNewModsLink">Add new mods</a>
+				</li>
+			</ul>
+			<form id="generalSettings">
+
+			</form>
+			<div id="modList" class="d-none">
+
+			</div>
+			<div id="addNewMods" class="d-none">
+
+			</div>
 		</section>
 	</div>
 
