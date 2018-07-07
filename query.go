@@ -138,7 +138,6 @@ func requestAddonData(addonID int) (AddonData, error) {
 
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil && err != io.EOF {
-		fmt.Println(err)
 		return data, err
 	}
 
@@ -157,6 +156,11 @@ type ModpackEditorCache struct {
 }
 
 func loadEditorCache() {
+	if disableCacheStore {
+		cachedMods = make(map[int]AddonData)
+		return
+	}
+
 	file, err := os.Open("modpackEditorCache.bin")
 	if err == nil {
 		defer file.Close()
@@ -201,6 +205,10 @@ func loadEditorCache() {
 }
 
 func writeEditorCache() {
+	if disableCacheStore {
+		return
+	}
+
 	cachedModsMutex.RLock()
 	defer cachedModsMutex.RUnlock()
 

@@ -20,6 +20,7 @@ var blankPackBox packr.Box
 var modpack Modpack
 var cachedMods map[int]AddonData
 var cachedModsMutex sync.RWMutex
+var disableCacheStore bool
 
 type postRequestData struct {
 	Folder string
@@ -80,9 +81,9 @@ func main() {
 
 	staticFilesBox = packr.NewBox("./static")
 	blankPackBox = packr.NewBox("./blankPack")
-	if !*nocache {
-		loadEditorCache()
-	}
+	disableCacheStore = *nocache
+
+	loadEditorCache()
 
 	fmt.Println("Welcome to modpack-editor!")
 	fmt.Printf("Listening on port %d, accessible at http://%s:%d/\n", *port, *ip, *port)
