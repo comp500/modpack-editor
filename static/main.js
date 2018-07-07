@@ -3,6 +3,15 @@ let currentModpack;
 // TODO: support SSC description?
 // TODO: support custom server config of mcVersion and forge?
 
+// Go equates [] and null, JavaScript does not.
+function nullableArray(array) {
+	if (array == null) {
+		return [];
+	} else {
+		return array;
+	}
+}
+
 const generalInputHandlers = [
 	{
 		id: "name",
@@ -62,10 +71,7 @@ const generalInputHandlers = [
 			});
 		},
 		get: () => {
-			let value = currentModpack.CurseManifest.minecraft.modLoaders;
-			if (value == null) {
-				throw new Error("Modloaders list doesn't exist in manifest.");
-			}
+			let value = nullableArray(currentModpack.CurseManifest.minecraft.modLoaders);
 
 			value.sort((a, b) => {
 				// Put the primary value first
@@ -101,7 +107,7 @@ const serverInputHandlers = [
 		id: "ignoreFiles",
 		label: "Folders to ignore",
 		handler: e => currentModpack.ServerSetupConfig.Install.IgnoreFiles = e.target.value.split(",").map(a => a.trim()),
-		get: () => currentModpack.ServerSetupConfig.Install.IgnoreFiles.join(",")
+		get: () => nullableArray(currentModpack.ServerSetupConfig.Install.IgnoreFiles).join(",")
 	},
 	// TODO: additionalFiles (with mod list?)
 	// TODO: localFiles
@@ -169,7 +175,7 @@ const serverInputHandlers = [
 		id: "javaArgs",
 		label: "Java arguments",
 		handler: e => currentModpack.ServerSetupConfig.Launch.JavaArgs = e.target.value.split(",").map(a => a.trim()),
-		get: () => currentModpack.ServerSetupConfig.Launch.JavaArgs.join(",")
+		get: () => nullableArray(currentModpack.ServerSetupConfig.Launch.JavaArgs).join(",")
 	}
 ];
 
@@ -185,11 +191,15 @@ function renderForm() {
 		if (inputObject.type == "checkbox") {
 			return hyperHTML.wire(currentModpack, ":" + inputObject.id)`
 			<div class="form-group row">
-				<label class="col-sm-3 col-form-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
+				<div class="col-sm-3"></div>
 				<div class="col-sm-9">
-					<input type="checkbox" id="${inputObject.id + "-input"}" checked="${value}" oninput="${inputObject.handler}">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="${inputObject.id + "-input"}" checked="${value}" oninput="${inputObject.handler}">
+						<label class="form-check-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
+					</div>
 				</div>
-			</div>`;
+			</div>
+			`;
 		}
 
 		return hyperHTML.wire(currentModpack, ":" + inputObject.id)`
