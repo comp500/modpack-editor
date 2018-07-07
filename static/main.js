@@ -74,28 +74,38 @@ const generalInputHandlers = [
 	}
 ];
 
+const serverInputHandlers = [
+	{
+		id: "pending",
+		label: "You're using a bad commit. Please update!",
+		handler: e => {},
+		get: () => "Work In Progress"
+	}
+];
+
 let currentData;
 
 function renderForm() {
-	const generalSettings = document.getElementById("generalSettings");
-	hyperHTML.bind(generalSettings)`
-	${
-		generalInputHandlers.map(inputObject => {
-			let value = inputObject.get();
+	let inputHandlerWire = (handlers) => handlers.map(inputObject => {
+		let value = inputObject.get();
 
-			if (value == null) {
-				throw new Error("Key " + inputObject.id + " doesn't exist in manifest.");
-			}
-			return hyperHTML.wire(currentData, ":" + inputObject.id)`
-			<div class="form-group row">
-				<label class="col-sm-3 col-form-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
-				<div class="col-sm-9">
-					<input type="text" class="form-control" id="${inputObject.id + "-input"}" value="${value}" oninput="${inputObject.handler}">
-				</div>
-			</div>`;
-		})
-	}
-	`;
+		if (value == null) {
+			throw new Error("Key " + inputObject.id + " doesn't exist in manifest.");
+		}
+		return hyperHTML.wire(currentData, ":" + inputObject.id)`
+		<div class="form-group row">
+			<label class="col-sm-3 col-form-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
+			<div class="col-sm-9">
+				<input type="text" class="form-control" id="${inputObject.id + "-input"}" value="${value}" oninput="${inputObject.handler}">
+			</div>
+		</div>`;
+	});
+
+	const generalSettings = document.getElementById("generalSettings");
+	hyperHTML.bind(generalSettings)`${inputHandlerWire(generalInputHandlers)}`;
+
+	const serverSettings = document.getElementById("serverSettings");
+	hyperHTML.bind(serverSettings)`${inputHandlerWire(serverInputHandlers)}`;
 
 	// Request mod data for each mod
 	const modList = document.getElementById("modList");
