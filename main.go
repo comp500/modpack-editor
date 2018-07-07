@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gobuffalo/packr"
 )
@@ -16,6 +17,7 @@ const port = 8080
 var staticFilesBox packr.Box
 var blankPackBox packr.Box
 var modpack Modpack
+var cachedMods map[int]AddonData
 
 type postRequestData struct {
 	Folder string
@@ -41,6 +43,28 @@ func ajaxHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func addonHandler(w http.ResponseWriter, r *http.Request) {
+	// Get addon id from /addon/12345
+	addonID, err := strconv.Atoi(r.URL.Path[7:])
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	data, err := requestAddonData(addonID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
+		// may have already written to output?
+		writeError(w, err)
+		return
+	}
+}
+
 func main() {
 	port := flag.Int("port", 8080, "The port that the HTTP server listens on")
 	ip := flag.String("ip", "127.0.0.1", "The ip that the HTTP server listens on")
@@ -48,6 +72,8 @@ func main() {
 
 	staticFilesBox = packr.NewBox("./static")
 	blankPackBox = packr.NewBox("./blankPack")
+	// TODO: load from file
+	cachedMods = make(map[int]AddonData)
 
 	fmt.Println("Welcome to modpack-editor!")
 	fmt.Printf("Listening on port %d, accessible at http://%s:%d/\n", *port, *ip, *port)
@@ -55,6 +81,7 @@ func main() {
 
 	http.Handle("/", http.FileServer(staticFilesBox))
 	http.HandleFunc("/ajax/", ajaxHandler)
+	http.HandleFunc("/addon/", addonHandler)
 	err := http.ListenAndServe(fmt.Sprintf("%s:%d", *ip, *port), nil)
 	if err != nil {
 		log.Println("Error starting server:")
