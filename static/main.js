@@ -225,7 +225,8 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 	const modListLink = document.getElementById("modListLink");
 	const addNewModsLink = document.getElementById("addNewModsLink");
 
-	generalSettingsLink.addEventListener("click", () => {
+	generalSettingsLink.addEventListener("click", e => {
+		e.preventDefault();
 		generalSettings.classList.remove("d-none");
 		modList.classList.add("d-none");
 		addNewMods.classList.add("d-none");
@@ -233,7 +234,8 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 		modListLink.classList.remove("active");
 		addNewModsLink.classList.remove("active");
 	}, false);
-	modListLink.addEventListener("click", () => {
+	modListLink.addEventListener("click", e => {
+		e.preventDefault();
 		generalSettings.classList.add("d-none");
 		modList.classList.remove("d-none");
 		addNewMods.classList.add("d-none");
@@ -241,7 +243,8 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 		modListLink.classList.add("active");
 		addNewModsLink.classList.remove("active");
 	}, false);
-	addNewModsLink.addEventListener("click", () => {
+	addNewModsLink.addEventListener("click", e => {
+		e.preventDefault();
 		generalSettings.classList.add("d-none");
 		modList.classList.add("d-none");
 		addNewMods.classList.remove("d-none");
