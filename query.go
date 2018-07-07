@@ -1,10 +1,15 @@
 package main
 
 import (
+	"compress/gzip"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -143,4 +148,79 @@ func requestAddonData(addonID int) (AddonData, error) {
 	cachedMods[addonID] = data
 	cachedModsMutex.Unlock()
 	return data, nil
+}
+
+// ModpackEditorCache is saved and loaded from disk
+type ModpackEditorCache struct {
+	CachedMods        map[int]AddonData
+	LastOpenedModpack string
+}
+
+func loadEditorCache() {
+	file, err := os.Open("modpackEditorCache.bin")
+	if err == nil {
+		defer file.Close()
+		var modpackEditorCache ModpackEditorCache
+		zr, err := gzip.NewReader(file)
+		if err != nil {
+			log.Print("Error loading from cache:")
+			log.Print(err)
+			cachedMods = make(map[int]AddonData)
+			return
+		}
+		err = gob.NewDecoder(zr).Decode(&modpackEditorCache)
+		if err != nil && err != io.EOF {
+			log.Print("Error loading from cache:")
+			log.Print(err)
+			cachedMods = make(map[int]AddonData)
+			return
+		}
+
+		cachedMods = modpackEditorCache.CachedMods
+		if len(modpackEditorCache.LastOpenedModpack) > 0 && modpack.Folder == "" {
+			folderAbsolute, err := filepath.Abs(modpackEditorCache.LastOpenedModpack)
+			if err != nil {
+				log.Print("Error loading modpack from cached folder:")
+				log.Print(err)
+				return
+			}
+
+			modpack = Modpack{Folder: folderAbsolute}
+			err = modpack.loadConfigFiles()
+			if err != nil {
+				log.Print("Error loading modpack from cached folder:")
+				log.Print(err)
+			}
+		}
+	} else if os.IsNotExist(err) {
+		cachedMods = make(map[int]AddonData)
+	} else {
+		log.Print("Error loading from cache:")
+		log.Print(err)
+	}
+}
+
+func writeEditorCache() {
+	cachedModsMutex.RLock()
+	defer cachedModsMutex.RUnlock()
+
+	file, err := os.Create("modpackEditorCache.bin")
+	if err != nil {
+		log.Print("Error writing to cache:")
+		log.Print(err)
+		return
+	}
+	defer file.Close()
+
+	modpackEditorCache := ModpackEditorCache{
+		CachedMods:        cachedMods,
+		LastOpenedModpack: modpack.Folder,
+	}
+	zw := gzip.NewWriter(file)
+	defer zw.Close()
+	err = gob.NewEncoder(zw).Encode(&modpackEditorCache)
+	if err != nil {
+		log.Print("Error writing to cache:")
+		log.Print(err)
+	}
 }

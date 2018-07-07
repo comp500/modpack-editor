@@ -61,6 +61,9 @@ func addonHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update cache
+	writeEditorCache()
+
 	err = json.NewEncoder(w).Encode(data)
 	if err != nil {
 		// may have already written to output?
@@ -72,12 +75,14 @@ func addonHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	port := flag.Int("port", 8080, "The port that the HTTP server listens on")
 	ip := flag.String("ip", "127.0.0.1", "The ip that the HTTP server listens on")
+	nocache := flag.Bool("nocache", false, "Don't store cached mod listings or modpack folders")
 	flag.Parse()
 
 	staticFilesBox = packr.NewBox("./static")
 	blankPackBox = packr.NewBox("./blankPack")
-	// TODO: load from file
-	cachedMods = make(map[int]AddonData)
+	if !*nocache {
+		loadEditorCache()
+	}
 
 	fmt.Println("Welcome to modpack-editor!")
 	fmt.Printf("Listening on port %d, accessible at http://%s:%d/\n", *port, *ip, *port)

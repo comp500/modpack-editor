@@ -69,6 +69,9 @@ func loadModpackFolder(w http.ResponseWriter, folder string) {
 		return
 	}
 
+	// Update cache
+	writeEditorCache()
+
 	// Send the modpack to the client
 	json.NewEncoder(w).Encode(struct {
 		Modpack Modpack
@@ -120,6 +123,9 @@ func createModpackFolder(w http.ResponseWriter, folder string) {
 		writeError(w, err)
 		return
 	}
+
+	// Update cache
+	writeEditorCache()
 
 	// Send the modpack to the client
 	json.NewEncoder(w).Encode(struct {
@@ -205,6 +211,9 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 
 	// Wait for all HTTP fetches to complete.
 	wg.Wait()
+
+	// Update cache
+	writeEditorCache()
 
 	return info, nil
 }
