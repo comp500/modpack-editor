@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gobuffalo/packr"
 )
@@ -18,6 +19,7 @@ var staticFilesBox packr.Box
 var blankPackBox packr.Box
 var modpack Modpack
 var cachedMods map[int]AddonData
+var cachedModsMutex sync.RWMutex
 
 type postRequestData struct {
 	Folder string

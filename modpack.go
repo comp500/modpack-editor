@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/gobuffalo/packr"
 )
@@ -142,7 +143,7 @@ func getCurrentPackDetails(w io.Writer) {
 type ModInfo struct {
 	Name         string
 	IconURL      string
-	ErrorMessage string
+	ErrorMessage error
 	// TODO: clientonly/serveronly
 	// TODO: Required?
 	// TODO: dates, rating, download counts?
@@ -152,24 +153,44 @@ type ModInfo struct {
 
 func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 	info := make(map[int]ModInfo)
+	var wg sync.WaitGroup
+	// Mutex for the ModInfo map
+	var mutex = &sync.RWMutex{}
 
 	for _, v := range m.CurseManifest.Files {
-		data, err := requestAddonData(v.ProjectID)
-		if err != nil {
-			return nil, err
-		}
+		// Increment the WaitGroup counter.
+		wg.Add(1)
 
-		var iconURL string
-		// Loop through attachments, set iconURL to last one
-		for _, v := range data.Attachments {
-			iconURL = v.URL
-		}
+		go func(projectID int) {
+			// Decrement the counter when the goroutine completes.
+			defer wg.Done()
 
-		info[v.ProjectID] = ModInfo{
-			Name:    data.Name,
-			IconURL: iconURL,
-		}
+			data, err := requestAddonData(projectID)
+			if err != nil {
+				mutex.Lock()
+				info[projectID] = ModInfo{
+					ErrorMessage: err,
+				}
+				mutex.Unlock()
+			}
+
+			var iconURL string
+			// Loop through attachments, set iconURL to last one
+			for _, v := range data.Attachments {
+				iconURL = v.URL
+			}
+
+			mutex.Lock()
+			info[projectID] = ModInfo{
+				Name:    data.Name,
+				IconURL: iconURL,
+			}
+			mutex.Unlock()
+		}(v.ProjectID)
 	}
+
+	// Wait for all HTTP fetches to complete.
+	wg.Wait()
 
 	return info, nil
 }

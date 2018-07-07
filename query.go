@@ -105,11 +105,14 @@ type AddonData struct {
 
 func requestAddonData(addonID int) (AddonData, error) {
 	// Use a cached mod, if it's available and up to date
+	cachedModsMutex.RLock()
 	if cachedMods[addonID].Available {
 		if time.Since(cachedMods[addonID].LastQueried) < 48*time.Hour {
+			defer cachedModsMutex.RUnlock()
 			return cachedMods[addonID], nil
 		}
 	}
+	cachedModsMutex.RUnlock()
 
 	// Uses the curse.nikky.moe api
 	var data AddonData
@@ -136,6 +139,8 @@ func requestAddonData(addonID int) (AddonData, error) {
 
 	// Add to cache
 	data.LastQueried = time.Now()
+	cachedModsMutex.Lock()
 	cachedMods[addonID] = data
+	cachedModsMutex.Unlock()
 	return data, nil
 }
