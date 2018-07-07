@@ -12,12 +12,14 @@ import (
 	"sync"
 
 	"github.com/gobuffalo/packr"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // Modpack is a modpack being edited by modpack-editor
 type Modpack struct {
-	Folder        string
-	CurseManifest CurseManifest
+	Folder            string
+	CurseManifest     CurseManifest
+	ServerSetupConfig ServerSetupConfig
 }
 
 // CurseManifest is a curse manifest.json file
@@ -43,12 +45,63 @@ type CurseManifest struct {
 	Overrides string `json:"overrides"`
 }
 
+// ServerSetupConfig is a ServerStarter server-setup-config.yaml
+type ServerSetupConfig struct {
+	Specver int `yaml:"_specver"`
+	Modpack struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	} `yaml:"modpack"`
+	Install struct {
+		McVersion         string `yaml:"mcVersion"`
+		ForgeVersion      string `yaml:"forgeVersion"`
+		ForgeInstallerURL string `yaml:"forgeInstallerUrl"`
+		ModpackURL        string `yaml:"modpackUrl"`
+		ModpackFormat     string `yaml:"modpackFormat"`
+		FormatSpecific    struct {
+			IgnoreProject []int `yaml:"ignoreProject"`
+		} `yaml:"formatSpecific"`
+		BaseInstallPath string   `yaml:"baseInstallPath"`
+		IgnoreFiles     []string `yaml:"ignoreFiles"`
+		AdditionalFiles []struct {
+			URL         string `yaml:"url"`
+			Destination string `yaml:"destination"`
+		} `yaml:"additionalFiles"`
+		LocalFiles []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		} `yaml:"localFiles"`
+		CheckFolder        bool   `yaml:"checkFolder"`
+		InstallForge       bool   `yaml:"installForge"`
+		SpongeBootstrapper string `yaml:"spongeBootstrapper"`
+	} `yaml:"install"`
+	Launch struct {
+		Spongefix    bool     `yaml:"spongefix"`
+		CheckOffline bool     `yaml:"checkOffline"`
+		MaxRAM       string   `yaml:"maxRam"`
+		AutoRestart  bool     `yaml:"autoRestart"`
+		CrashLimit   int      `yaml:"crashLimit"`
+		CrashTimer   string   `yaml:"crashTimer"`
+		PreJavaArgs  string   `yaml:"preJavaArgs"`
+		JavaArgs     []string `yaml:"javaArgs"`
+	} `yaml:"launch"`
+}
+
 func (m *Modpack) loadConfigFiles() error {
 	manifest, err := ioutil.ReadFile(filepath.Join(m.Folder, "manifest.json"))
 	if err != nil {
 		return err
 	}
 	err = json.Unmarshal(manifest, &m.CurseManifest)
+	if err != nil {
+		return err
+	}
+
+	config, err := ioutil.ReadFile(filepath.Join(m.Folder, "server-setup-config.yaml"))
+	if err != nil {
+		return err
+	}
+	err = yaml.Unmarshal(config, &m.ServerSetupConfig)
 	if err != nil {
 		return err
 	}

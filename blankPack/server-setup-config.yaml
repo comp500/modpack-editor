@@ -1,0 +1,94 @@
+# Version of the specs, only for internal usage if this format should ever change
+_specver: 1
+
+# modpack related settings, changes the supposed to change the visual appearance of the launcher
+modpack:
+  # Name of the mod pack, that is displayed in various places where it fits
+  name: ~
+
+  # Description
+  description: ~
+
+
+
+# settings regarding the installation of the modpack
+install:
+  # version of minecraft, needs the exact version
+  mcVersion: ~
+
+  # exact version of forge that is supposed to be used
+  # if this value is a null value so ( ~, null, or "" ) then the version from the mod pack is going to be used
+  forgeVersion: ~
+
+  # If a custom installer is supposed to used, specify the url here: (Otherwise put "", ~ or null here)
+  forgeInstallerUrl: ~
+
+  # Link to where the file where the modpack can be distributed
+  modpackUrl: ~
+
+  # This is used to specify in which format the modpack is distributed, the server launcher has to handle each individually if their format differs
+  modpackFormat: curseforge
+
+  # Settings which are specific to the format used, might not be needed in some casese
+  formatSpecific:
+    # optional paramenter used for curse to specify a whole project to ignore (mostly if it is client side only)
+    ignoreProject: ~
+
+
+
+  # The base path where the server should be installed to, ~ for current path
+  baseInstallPath: ~
+
+  # a list of files which are supposed to be ignored when installing it from the client files
+  # this is supposed to support regex
+  ignoreFiles:
+    - resources/**
+    - resourcepacks/**
+
+  # often a server needs more files, which are nearly useless on the client, such as tickprofiler
+  # This is a list of files, each ' - ' is a new file:
+  # url is the directlink to the file, destination is the path to where the file should be copied to
+  additionalFiles:
+    ~
+
+  # For often there are config which the user wants to change, here is the place to put the local path to configs, jars or whatever
+  localFiles: ~
+
+  # This makes the program check the folder for whether it is supposed to use the
+  checkFolder: yes
+
+  # Whether to install Forge or not, should always be yes/true unless you only want to install the pack
+  installForge: yes
+
+
+
+
+# settings regarding the launching of the pack
+launch:
+  # applies the launch wrapper to fix sponge for a few mods
+  spongefix: no
+
+  # checks with the help of a few unrelated server whether the server is online
+  checkOffline: no
+
+  # specifies the max amount of ram the server is supposed to launch with
+  maxRam: 5G
+
+  # specifies whether the server is supposed to auto restart after crash
+  autoRestart: yes
+
+  # after a given amount of crashes in a given time the server will stop auto restarting
+  crashLimit: 10
+
+  # Time a crash should be still accounted for in the {crashLimit}
+  # syntax is either [number]h or [number]min or [number]s
+  crashTimer: 60min
+
+  # Arguments that need to go before the 'java' argument, something like linux niceness
+  # This is only a string, not a list.
+  preJavaArgs: ~
+
+
+  # Java args that are supposed to be used when the server launches
+  # keep in mind java args often need ' - ' in front of it to work, use clarifying parentheses to make sure it uses it correctly
+  javaArgs: ~

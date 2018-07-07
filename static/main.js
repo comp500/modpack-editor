@@ -1,105 +1,59 @@
-const textInputMapping = {
-	"name": "Pack Name",
-	"version": "Version",
-	"author": "Author",
-	"projectID": "Curse Project ID",
-	"overrides": "Overrides folder name"
-};
-
-const blankTemplate = {
-    "minecraft": {
-        "version": "",
-        "modLoaders": []
-    },
-    "manifestType": "minecraftModpack",
-    "manifestVersion": 1,
-    "name": "",
-    "version": "",
-    "author": "",
-    "projectID": 0,
-    "files": [],
-    "overrides": "overrides"
-};
-
-let currentData;
-
-function renderForm() {
-	let inputHandler = key => {
-		return e => {
-			currentData[key] = e.target.value;
-		};
-	};
-
-	let numberInputHandler = key => {
-		return e => {
-			currentData[key] = parseInt(e.target.value);
-		};
-	};
-
-	let mcVersionInputHandler = e => {
-		currentData.minecraft.version = e.target.value;
-	};
-
-	// Split list into objects, with primary modLoader first
-	let modLoaderInputHandler = e => {
-		let isFirst = true;
-		currentData.minecraft.modLoaders = e.target.value.split(",").map(modLoader => {
-			if (isFirst) {
-				isFirst = false;
+const generalInputHandlers = [
+	{
+		id: "name",
+		label: "Pack Name",
+		handler: e => currentData.name = e.target.value,
+		get: () => currentData.name
+	},
+	{
+		id: "version",
+		label: "Version",
+		handler: e => currentData.version = e.target.value,
+		get: () => currentData.version
+	},
+	{
+		id: "author",
+		label: "Author",
+		handler: e => currentData.author = e.target.value,
+		get: () => currentData.author
+	},
+	{
+		id: "projectID",
+		label: "Curse Project ID",
+		handler: e => currentData.projectID = e.target.value,
+		get: () => currentData.projectID
+	},
+	{
+		id: "overrides",
+		label: "Overrides folder name",
+		handler: e => currentData.overrides = e.target.value,
+		get: () => currentData.overrides
+	},
+	{
+		id: "mcVersion",
+		label: "Minecraft version",
+		handler: e => currentData.minecraft.version = e.target.value,
+		get: () => currentData.minecraft.version
+	},
+	{
+		id: "modLoaders",
+		label: "Modloader ID(s) (e.g. forge-14.23.4.2715)",
+		handler: e => {
+			let isFirst = true;
+			currentData.minecraft.modLoaders = e.target.value.split(",").map(modLoader => {
+				if (isFirst) {
+					isFirst = false;
+					return {
+						id: modLoader.trim(),
+						primary: true
+					};
+				}
 				return {
-					id: modLoader.trim(),
-					primary: true
+					id: modLoader.trim()
 				};
-			}
-			return {
-				id: modLoader.trim()
-			};
-		});
-	};
-
-	const generalSettings = document.getElementById("generalSettings");
-	hyperHTML.bind(generalSettings)`
-	${
-		Object.keys(textInputMapping).map((key) => {
-			let value = currentData[key];
-			if (value == null) {
-				throw new Error("Key " + key + " doesn't exist in manifest.");
-			}
-
-			let handler;
-			if (Number.isInteger(value)) { // Is it a number?
-				handler = numberInputHandler(key);
-			} else {
-				handler = inputHandler(key);
-			}
-
-			return hyperHTML.wire(currentData, ":" + key)`
-			<div class="form-group row">
-				<label class="col-sm-3 col-form-label" for="${key + "-input"}">${textInputMapping[key]}</label>
-				<div class="col-sm-9">
-					<input type="text" class="form-control" id="${key + "-input"}" value="${value}" oninput="${handler}">
-				</div>
-			</div>`;
-		})
-	}
-	${
-		(() => {
-			let value = currentData.minecraft.version;
-			if (value == null) {
-				throw new Error("Minecraft version doesn't exist in manifest.");
-			}
-
-			return hyperHTML.wire(currentData, ":mcVersion")`
-			<div class="form-group row">
-				<label class="col-sm-3 col-form-label" for="mcVersion-input">Minecraft version</label>
-				<div class="col-sm-9">
-					<input type="text" class="form-control" id="mcVersion-input" value="${value}" oninput="${mcVersionInputHandler}">
-				</div>
-			</div>`;
-		})()
-	}
-	${
-		(() => {
+			});
+		},
+		get: () => {
 			let value = currentData.minecraft.modLoaders;
 			if (value == null) {
 				throw new Error("Modloaders list doesn't exist in manifest.");
@@ -115,16 +69,31 @@ function renderForm() {
 				}
 				return 0;
 			});
-			let valueConverted = value.map(a => a.id).join(",");
+			return value.map(a => a.id).join(",");
+		}
+	}
+];
 
-			return hyperHTML.wire(currentData, ":modLoaders")`
+let currentData;
+
+function renderForm() {
+	const generalSettings = document.getElementById("generalSettings");
+	hyperHTML.bind(generalSettings)`
+	${
+		generalInputHandlers.map(inputObject => {
+			let value = inputObject.get();
+
+			if (value == null) {
+				throw new Error("Key " + inputObject.id + " doesn't exist in manifest.");
+			}
+			return hyperHTML.wire(currentData, ":" + inputObject.id)`
 			<div class="form-group row">
-				<label class="col-sm-3 col-form-label" for="mcVersion-input">Modloader ID(s) (e.g. forge-14.23.4.2715)</label>
+				<label class="col-sm-3 col-form-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
 				<div class="col-sm-9">
-					<input type="text" class="form-control" id="mcVersion-input" value="${valueConverted}" oninput="${modLoaderInputHandler}">
+					<input type="text" class="form-control" id="${inputObject.id + "-input"}" value="${value}" oninput="${inputObject.handler}">
 				</div>
 			</div>`;
-		})()
+		})
 	}
 	`;
 
