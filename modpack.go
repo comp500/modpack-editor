@@ -76,7 +76,7 @@ type ServerSetupConfig struct {
 		SpongeBootstrapper string `yaml:"spongeBootstrapper"`
 	} `yaml:"install"`
 	Launch struct {
-		Spongefix    bool     `yaml:"spongefix"`
+		SpongeFix    bool     `yaml:"spongefix"`
 		CheckOffline bool     `yaml:"checkOffline"`
 		MaxRAM       string   `yaml:"maxRam"`
 		AutoRestart  bool     `yaml:"autoRestart"`

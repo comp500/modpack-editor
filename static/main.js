@@ -1,46 +1,54 @@
+let currentModpack;
+
+// TODO: support SSC description?
+// TODO: support custom server config of mcVersion and forge?
+
 const generalInputHandlers = [
 	{
 		id: "name",
 		label: "Pack Name",
-		handler: e => currentData.name = e.target.value,
-		get: () => currentData.name
+		handler: e => {
+			currentModpack.CurseManifest.name = e.target.value;
+			currentModpack.ServerSetupConfig.Name = e.target.value;
+		},
+		get: () => currentModpack.CurseManifest.name
 	},
 	{
 		id: "version",
 		label: "Version",
-		handler: e => currentData.version = e.target.value,
-		get: () => currentData.version
+		handler: e => currentModpack.CurseManifest.version = e.target.value,
+		get: () => currentModpack.CurseManifest.version
 	},
 	{
 		id: "author",
 		label: "Author",
-		handler: e => currentData.author = e.target.value,
-		get: () => currentData.author
+		handler: e => currentModpack.CurseManifest.author = e.target.value,
+		get: () => currentModpack.CurseManifest.author
 	},
 	{
 		id: "projectID",
 		label: "Curse Project ID",
-		handler: e => currentData.projectID = parseInt(e.target.value),
-		get: () => currentData.projectID
+		handler: e => currentModpack.CurseManifest.projectID = parseInt(e.target.value),
+		get: () => currentModpack.CurseManifest.projectID
 	},
 	{
 		id: "overrides",
 		label: "Overrides folder name",
-		handler: e => currentData.overrides = e.target.value,
-		get: () => currentData.overrides
+		handler: e => currentModpack.CurseManifest.overrides = e.target.value,
+		get: () => currentModpack.CurseManifest.overrides
 	},
 	{
 		id: "mcVersion",
 		label: "Minecraft version",
-		handler: e => currentData.minecraft.version = e.target.value,
-		get: () => currentData.minecraft.version
+		handler: e => currentModpack.CurseManifest.minecraft.version = e.target.value,
+		get: () => currentModpack.CurseManifest.minecraft.version
 	},
 	{
 		id: "modLoaders",
 		label: "Modloader ID(s) (e.g. forge-14.23.4.2715)",
 		handler: e => {
 			let isFirst = true;
-			currentData.minecraft.modLoaders = e.target.value.split(",").map(modLoader => {
+			currentModpack.CurseManifest.minecraft.modLoaders = e.target.value.split(",").map(modLoader => {
 				if (isFirst) {
 					isFirst = false;
 					return {
@@ -54,7 +62,7 @@ const generalInputHandlers = [
 			});
 		},
 		get: () => {
-			let value = currentData.minecraft.modLoaders;
+			let value = currentModpack.CurseManifest.minecraft.modLoaders;
 			if (value == null) {
 				throw new Error("Modloaders list doesn't exist in manifest.");
 			}
@@ -74,29 +82,121 @@ const generalInputHandlers = [
 	}
 ];
 
+//currentModpack.ServerSetupConfig.Install.FormatSpecific.IgnoreProject
 const serverInputHandlers = [
 	{
-		id: "pending",
-		label: "You're using a bad commit. Please update!",
-		handler: e => {},
-		get: () => "Work In Progress"
+		id: "packURL",
+		label: "Pack download link",
+		handler: e => currentModpack.ServerSetupConfig.Install.ModpackURL = e.target.value,
+		get: () => currentModpack.ServerSetupConfig.Install.ModpackURL
+	},
+	// TODO: IgnoreProject (with mod list?)
+	{
+		id: "baseInstallPath",
+		label: "Installation path (leave empty for current path)",
+		handler: e => currentModpack.ServerSetupConfig.Install.BaseInstallPath = e.target.value,
+		get: () => currentModpack.ServerSetupConfig.Install.BaseInstallPath
+	},
+	{
+		id: "ignoreFiles",
+		label: "Folders to ignore",
+		handler: e => currentModpack.ServerSetupConfig.Install.IgnoreFiles = e.target.value.split(",").map(a => a.trim()),
+		get: () => currentModpack.ServerSetupConfig.Install.IgnoreFiles.join(",")
+	},
+	// TODO: additionalFiles (with mod list?)
+	// TODO: localFiles
+	{
+		id: "checkFolder",
+		label: "Check folder (?)",
+		type: "checkbox",
+		handler: e => currentModpack.ServerSetupConfig.Install.CheckFolder = e.target.checked,
+		get: () => currentModpack.ServerSetupConfig.Install.CheckFolder
+	},
+	{
+		id: "installForge",
+		label: "Install Forge",
+		type: "checkbox",
+		handler: e => currentModpack.ServerSetupConfig.Install.InstallForge = e.target.checked,
+		get: () => currentModpack.ServerSetupConfig.Install.InstallForge
+	},
+	{
+		id: "spongeFix",
+		label: "Apply launch wrapper to fix Sponge",
+		type: "checkbox",
+		handler: e => currentModpack.ServerSetupConfig.Launch.SpongeFix = e.target.checked,
+		get: () => currentModpack.ServerSetupConfig.Launch.SpongeFix
+	},
+	{
+		id: "checkOffline",
+		label: "Check if server is online while installing",
+		type: "checkbox",
+		handler: e => currentModpack.ServerSetupConfig.Launch.CheckOffline = e.target.checked,
+		get: () => currentModpack.ServerSetupConfig.Launch.CheckOffline
+	},
+	{
+		id: "maxRAM",
+		label: "Maximum RAM allocation",
+		handler: e => currentModpack.ServerSetupConfig.Launch.MaxRAM = e.target.value,
+		get: () => currentModpack.ServerSetupConfig.Launch.MaxRAM
+	},
+	{
+		id: "autoRestart",
+		label: "Auto restart server after crash",
+		type: "checkbox",
+		handler: e => currentModpack.ServerSetupConfig.Launch.AutoRestart = e.target.checked,
+		get: () => currentModpack.ServerSetupConfig.Launch.AutoRestart
+	},
+	{
+		id: "crashLimit",
+		label: "Number of crashes to stop restarting after",
+		handler: e => currentModpack.ServerSetupConfig.Launch.CrashLimit = parseInt(e.target.value),
+		get: () => currentModpack.ServerSetupConfig.Launch.CrashLimit
+	},
+	{
+		id: "crashTimer",
+		label: "Time to count crash number within",
+		handler: e => currentModpack.ServerSetupConfig.Launch.CrashTimer = e.target.value,
+		get: () => currentModpack.ServerSetupConfig.Launch.CrashTimer
+	},
+	{
+		id: "preJavaArgs",
+		label: "Arguments before java command",
+		handler: e => currentModpack.ServerSetupConfig.Launch.PreJavaArgs = e.target.value,
+		get: () => currentModpack.ServerSetupConfig.Launch.PreJavaArgs
+	},
+	// TODO: make java args easier to edit
+	{
+		id: "javaArgs",
+		label: "Java arguments",
+		handler: e => currentModpack.ServerSetupConfig.Launch.JavaArgs = e.target.value.split(",").map(a => a.trim()),
+		get: () => currentModpack.ServerSetupConfig.Launch.JavaArgs.join(",")
 	}
 ];
-
-let currentData;
 
 function renderForm() {
 	let inputHandlerWire = (handlers) => handlers.map(inputObject => {
 		let value = inputObject.get();
 
-		if (value == null) {
+		// may be falsy, so use ===
+		if (value === null || value === undefined) {
 			throw new Error("Key " + inputObject.id + " doesn't exist in manifest.");
 		}
-		return hyperHTML.wire(currentData, ":" + inputObject.id)`
+
+		if (inputObject.type == "checkbox") {
+			return hyperHTML.wire(currentModpack, ":" + inputObject.id)`
+			<div class="form-group row">
+				<label class="col-sm-3 col-form-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
+				<div class="col-sm-9">
+					<input type="checkbox" id="${inputObject.id + "-input"}" checked="${value}" oninput="${inputObject.handler}">
+				</div>
+			</div>`;
+		}
+
+		return hyperHTML.wire(currentModpack, ":" + inputObject.id)`
 		<div class="form-group row">
 			<label class="col-sm-3 col-form-label" for="${inputObject.id + "-input"}">${inputObject.label}</label>
 			<div class="col-sm-9">
-				<input type="text" class="form-control" id="${inputObject.id + "-input"}" value="${value}" oninput="${inputObject.handler}">
+				<input type="${inputObject.type ? inputObject.type : "text"}" class="form-control" id="${inputObject.id + "-input"}" value="${value}" oninput="${inputObject.handler}">
 			</div>
 		</div>`;
 	});
@@ -119,9 +219,9 @@ function renderForm() {
 					return;
 				}
 
-				modListLink.innerText = "Mod list (" + currentData.files.length + " mods)";
+				modListLink.innerText = "Mod list (" + currentModpack.CurseManifest.files.length + " mods)";
 
-				return currentData.files.sort((a, b) => {
+				return currentModpack.CurseManifest.files.sort((a, b) => {
 					// Push missing projects to the top
 					if (!data[a.projectID] || data[a.projectID].ErrorMessage) {
 						return -1;
@@ -130,32 +230,32 @@ function renderForm() {
 					}
 					return data[a.projectID].Name.localeCompare(data[b.projectID].Name);
 				}).map(currentMod => {
-					let currentData = data[currentMod.projectID];
-					if (!currentData || currentData.ErrorMessage) {
+					let currentModData = data[currentMod.projectID];
+					if (!currentModData || currentModData.ErrorMessage) {
 						return hyperHTML.wire()`
 						<li class="list-group-item list-group-item-warning flex-row d-flex">
 							<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
 							<div class="flex-fill">
 								<h5 class="mb-1">An error occurred (project id ${currentMod.projectID})</h5>
-								<p class="mb-1">${currentData ? currentData.ErrorMessage : ""}</p>
+								<p class="mb-1">${currentModData ? currentModData.ErrorMessage : ""}</p>
 							</div>
 						</li>
 						`;
 					}
 
-					let iconURL = currentData.IconURL ? currentData.IconURL : "/MissingTexture.png";
+					let iconURL = currentModData.IconURL ? currentModData.IconURL : "/MissingTexture.png";
 					// Replace curseforge with minecraft.curseforge
-					let websiteURL = currentData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
+					let websiteURL = currentModData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
 
 					return hyperHTML.wire()`
 					<li class="list-group-item flex-row d-flex">
 						<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
 						<div class="flex-fill">
 							<div class="d-flex justify-content-between">
-								<h5 class="mb-1"><a href="${websiteURL}">${currentData.Name}</a></h5>
+								<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
 								<small class="text-muted">3 days ago</small>
 							</div>
-							<p class="mb-1">${currentData.Summary}</p>
+							<p class="mb-1">${currentModData.Summary}</p>
 						</div>
 					</li>
 					`;
@@ -170,11 +270,6 @@ function renderForm() {
 	// Unhide editor
 	const editor = document.getElementById("editor");
 	editor.classList.remove("d-none");
-}
-
-function handleString(input) {
-	currentData = JSON.parse(input);
-	renderForm();
 }
 
 const openMessagesElement = document.getElementById("openMessages");
@@ -208,7 +303,7 @@ openModpackButtonElement.addEventListener("click", () => {
 			return;
 		}
 		showOpenSuccess(false);
-		currentData = data.Modpack.CurseManifest;
+		currentModpack = data.Modpack;
 		renderForm();
 	}).catch(function(error) {
 		logOpenError(error);
@@ -231,7 +326,7 @@ newModpackButtonElement.addEventListener("click", () => {
 			return;
 		}
 		showOpenSuccess(true);
-		currentData = data.Modpack.CurseManifest;
+		currentModpack = data.Modpack;
 		renderForm();
 	}).catch(function(error) {
 		logOpenError(error);
@@ -249,7 +344,7 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 	}
 	showOpenSuccess(false);
 	modpackLocationInput.value = data.Modpack.Folder;
-	currentData = data.Modpack.CurseManifest;
+	currentModpack = data.Modpack;
 	renderForm();
 }).catch(function(error) {
 	logOpenError(error);
