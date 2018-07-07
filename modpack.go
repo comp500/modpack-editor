@@ -150,6 +150,8 @@ type ModInfo struct {
 	// TODO: dates, rating, download counts?
 	// TODO: categories?
 	// TODO: author(s)?
+	Summary    string
+	WebsiteURL string
 }
 
 func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
@@ -176,18 +178,26 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 			}
 
 			var iconURL string
-			// Loop through attachments, set iconURL to last one
+			// Loop through attachments, set iconURL to one which is set to true
 			// Replace size in url (256/256) to 62/62
 			for _, v := range data.Attachments {
+				if !v.Default {
+					continue
+				}
+				// TODO: move replacement to JS?
 				iconURL = strings.Replace(v.ThumbnailURL, "256/256", "62/62", 1)
 				// Curseforge does this for gifs for some reason...
+				// TODO: Find out when it does this somehow.
+				// Informational Accessories doesn't do this, but AE2 and Hwyla and Clumps do.
 				iconURL = strings.Replace(iconURL, ".gif", "_animated.gif", 1)
 			}
 
 			mutex.Lock()
 			info[projectID] = ModInfo{
-				Name:    data.Name,
-				IconURL: iconURL,
+				Name:       data.Name,
+				IconURL:    iconURL,
+				Summary:    data.Summary,
+				WebsiteURL: data.WebsiteURL,
 			}
 			mutex.Unlock()
 		}(v.ProjectID)

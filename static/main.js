@@ -130,27 +130,63 @@ function renderForm() {
 
 	// Request mod data for each mod
 	const modList = document.getElementById("modList");
+	const modListLink = document.getElementById("modListLink");
 	hyperHTML.bind(modList)`
-	${{
-		any: fetch("/ajax/getModInfoList").then(response => response.json()).then(function(data) {
-			if (data.ErrorMessage) {
-				logOpenError(data.ErrorMessage);
-				return;
-			}
-			return currentData.files.sort((a, b) => {
-				return data[a.projectID].Name.localeCompare(data[b.projectID].Name);
-			}).map(currentMod => {
-				let currentData = data[currentMod.projectID];
-				let iconURL = currentData.IconURL ? currentData.IconURL : "/MissingTexture.png";
-				return hyperHTML.wire()`
-				<p><img src="${iconURL}" class="img-thumbnail modIcon"> ${currentData.Name}</p>
-				`;
-			})
-		}).catch(function(error) {
-			logOpenError(error);
-		}),
-		placeholder: "Loading mod list..."
-	}}
+	<ul class="list-group">
+		${{
+			any: fetch("/ajax/getModInfoList").then(response => response.json()).then(function(data) {
+				if (data.ErrorMessage) {
+					logOpenError(data.ErrorMessage);
+					return;
+				}
+
+				modListLink.innerText = "Mod list (" + currentData.files.length + " mods)";
+
+				return currentData.files.sort((a, b) => {
+					// Push missing projects to the top
+					if (!data[a.projectID] || data[a.projectID].ErrorMessage) {
+						return -1;
+					} else if (!data[b.projectID] || data[b.projectID].ErrorMessage) {
+						return 1;
+					}
+					return data[a.projectID].Name.localeCompare(data[b.projectID].Name);
+				}).map(currentMod => {
+					let currentData = data[currentMod.projectID];
+					if (!currentData || currentData.ErrorMessage) {
+						return hyperHTML.wire()`
+						<li class="list-group-item list-group-item-warning flex-row d-flex">
+							<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
+							<div class="flex-fill">
+								<h5 class="mb-1">An error occurred (project id ${currentMod.projectID})</h5>
+								<p class="mb-1">${currentData ? currentData.ErrorMessage : ""}</p>
+							</div>
+						</li>
+						`;
+					}
+
+					let iconURL = currentData.IconURL ? currentData.IconURL : "/MissingTexture.png";
+					// Replace curseforge with minecraft.curseforge
+					let websiteURL = currentData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
+
+					return hyperHTML.wire()`
+					<li class="list-group-item flex-row d-flex">
+						<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
+						<div class="flex-fill">
+							<div class="d-flex justify-content-between">
+								<h5 class="mb-1"><a href="${websiteURL}">${currentData.Name}</a></h5>
+								<small class="text-muted">3 days ago</small>
+							</div>
+							<p class="mb-1">${currentData.Summary}</p>
+						</div>
+					</li>
+					`;
+				})
+			}).catch(function(error) {
+				logOpenError(error);
+			}),
+			placeholder: "Loading mod list..."
+		}}
+	</ul>
 	`;
 	// Unhide editor
 	const editor = document.getElementById("editor");
