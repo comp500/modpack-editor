@@ -137,3 +137,54 @@ func getCurrentPackDetails(w io.Writer) {
 		}{modpack})
 	}
 }
+
+// ModInfo is a partial mod information struct used for listing mods
+type ModInfo struct {
+	Name         string
+	IconURL      string
+	ErrorMessage string
+	// TODO: clientonly/serveronly
+	// TODO: Required?
+	// TODO: dates, rating, download counts?
+	// TODO: categories?
+	// TODO: author(s)?
+}
+
+func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
+	info := make(map[int]ModInfo)
+
+	for _, v := range m.CurseManifest.Files {
+		data, err := requestAddonData(v.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+
+		var iconURL string
+		// Loop through attachments, set iconURL to last one
+		for _, v := range data.Attachments {
+			iconURL = v.URL
+		}
+
+		info[v.ProjectID] = ModInfo{
+			Name:    data.Name,
+			IconURL: iconURL,
+		}
+	}
+
+	return info, nil
+}
+
+func handleGetModInfoList(w http.ResponseWriter) {
+	if modpack.Folder == "" { // Empty modpack
+		json.NewEncoder(w).Encode(make(map[int]ModInfo))
+	} else {
+		info, err := modpack.getModInfoList()
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+
+		// Send the mod info list to the client
+		json.NewEncoder(w).Encode(&info)
+	}
+}

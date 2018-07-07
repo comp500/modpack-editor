@@ -132,22 +132,22 @@ function renderForm() {
 	const modList = document.getElementById("modList");
 	hyperHTML.bind(modList)`
 	${{
-		any: currentData.files.map(modData => {
-			let modID = modData.projectID;
-			return fetch("/addon/" + modID).then(response => response.json()).then(function(data) {
-				if (data.ErrorMessage) {
-					logOpenError(data.ErrorMessage);
-					return;
-				}
+		any: fetch("/ajax/getModInfoList").then(response => response.json()).then(function(data) {
+			if (data.ErrorMessage) {
+				logOpenError(data.ErrorMessage);
+				return;
+			}
+			return currentData.files.map(modData => {
+				let modID = modData.projectID;
 				return hyperHTML.wire()
 				`
-				<p>${data.name}</p>
+				<p>${data[modID].Name}</p>
 				`;
-			}).catch(function(error) {
-				logOpenError(error);
-			});
+			})
+		}).catch(function(error) {
+			logOpenError(error);
 		}),
-		placeholder: "lol"
+		placeholder: "Loading mod list..."
 	}}
 	`;
 	// Unhide editor

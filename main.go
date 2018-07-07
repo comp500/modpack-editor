@@ -38,6 +38,8 @@ func ajaxHandler(w http.ResponseWriter, r *http.Request) {
 		loadModpackFolder(w, data.Folder)
 	case "/ajax/createModpackFolder":
 		createModpackFolder(w, data.Folder)
+	case "/ajax/getModInfoList":
+		handleGetModInfoList(w)
 	default:
 		w.WriteHeader(404)
 	}
