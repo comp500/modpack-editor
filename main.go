@@ -50,7 +50,7 @@ func main() {
 	blankPackBox = packr.NewBox("./blankPack")
 
 	fmt.Println("Welcome to modpack-editor!")
-	fmt.Printf("Listening on port %d, accessible at http://127.0.0.1:%d/\n", *port, *port)
+	fmt.Printf("Listening on port %d, accessible at http://%s:%d/\n", *port, *ip, *port)
 	fmt.Println("Press CTRL+C to exit.")
 
 	http.Handle("/", http.FileServer(staticFilesBox))
