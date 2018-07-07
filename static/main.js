@@ -20,7 +20,7 @@ const generalInputHandlers = [
 	{
 		id: "projectID",
 		label: "Curse Project ID",
-		handler: e => currentData.projectID = e.target.value,
+		handler: e => currentData.projectID = parseInt(e.target.value),
 		get: () => currentData.projectID
 	},
 	{
@@ -246,40 +246,28 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 });
 
 // Tabbed UI
-((document) => {
-	const generalSettings = document.getElementById("generalSettings");
-	const modList = document.getElementById("modList");
-	const addNewMods = document.getElementById("addNewMods");
+function createTabbedUI(tabs, links) {
+	let tabElements = tabs.map((a) => document.getElementById(a));
+	let linkElements = links.map((a) => document.getElementById(a));
+	linkElements.forEach((linkEl, i) => {
+		let currentEl = tabElements[i];
+		linkEl.addEventListener("click", e => {
+			e.preventDefault();
 
-	const generalSettingsLink = document.getElementById("generalSettingsLink");
-	const modListLink = document.getElementById("modListLink");
-	const addNewModsLink = document.getElementById("addNewModsLink");
+			currentEl.classList.remove("d-none");
+			tabElements.forEach((unsel) => {
+				if (unsel != currentEl) {
+					unsel.classList.add("d-none"); 
+				}
+			});
+			linkEl.classList.add("active");
+			linkElements.forEach((unsel) => {
+				if (unsel != linkEl) {
+					unsel.classList.remove("active"); 
+				}
+			});
+		}, false);
+	});
+}
 
-	generalSettingsLink.addEventListener("click", e => {
-		e.preventDefault();
-		generalSettings.classList.remove("d-none");
-		modList.classList.add("d-none");
-		addNewMods.classList.add("d-none");
-		generalSettingsLink.classList.add("active");
-		modListLink.classList.remove("active");
-		addNewModsLink.classList.remove("active");
-	}, false);
-	modListLink.addEventListener("click", e => {
-		e.preventDefault();
-		generalSettings.classList.add("d-none");
-		modList.classList.remove("d-none");
-		addNewMods.classList.add("d-none");
-		generalSettingsLink.classList.remove("active");
-		modListLink.classList.add("active");
-		addNewModsLink.classList.remove("active");
-	}, false);
-	addNewModsLink.addEventListener("click", e => {
-		e.preventDefault();
-		generalSettings.classList.add("d-none");
-		modList.classList.add("d-none");
-		addNewMods.classList.remove("d-none");
-		generalSettingsLink.classList.remove("active");
-		modListLink.classList.remove("active");
-		addNewModsLink.classList.add("active");
-	}, false);
-})(document);
+createTabbedUI(["generalSettings", "serverSettings", "modList", "addNewMods"], ["generalSettingsLink", "serverSettingsLink", "modListLink", "addNewModsLink"]);
