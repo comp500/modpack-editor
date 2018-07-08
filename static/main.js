@@ -1,4 +1,5 @@
 let currentModpack;
+let cachedModInfoList = {};
 
 // TODO: support SSC description?
 // TODO: support custom server config of mcVersion and forge?
@@ -216,10 +217,84 @@ function renderForm() {
 
 	const serverSettings = document.getElementById("serverSettings");
 	hyperHTML.bind(serverSettings)`${inputHandlerWire(serverInputHandlers)}`;
+}
+
+function updateModList() {
+	const modList = document.getElementById("modList");
+	hyperHTML.bind(modList)`
+	<ul class="list-group">
+		${renderModListContent()}
+	</ul>
+	`;
+}
+
+function renderModListContent() {
+	const modListLink = document.getElementById("modListLink");
+
+	modListLink.innerText = "Mod list (" + currentModpack.CurseManifest.files.length + " mods)";
+
+	return currentModpack.CurseManifest.files.sort((a, b) => {
+		// Push missing projects to the top
+		if (!cachedModInfoList[a.projectID] || cachedModInfoList[a.projectID].ErrorMessage) {
+			return -1;
+		} else if (!cachedModInfoList[b.projectID] || cachedModInfoList[b.projectID].ErrorMessage) {
+			return 1;
+		}
+		return cachedModInfoList[a.projectID].Name.localeCompare(cachedModInfoList[b.projectID].Name);
+	}).map(currentMod => {
+		let currentModData = cachedModInfoList[currentMod.projectID];
+		if (!currentModData || currentModData.ErrorMessage) {
+			return hyperHTML.wire()`
+			<li class="list-group-item list-group-item-warning flex-row d-flex">
+				<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
+				<div class="flex-fill">
+					<h5 class="mb-1">An error occurred (project id ${currentMod.projectID})</h5>
+					<p class="mb-1">${currentModData ? currentModData.ErrorMessage : ""}</p>
+				</div>
+			</li>
+			`;
+		}
+
+		let iconURL = currentModData.IconURL ? currentModData.IconURL : "/MissingTexture.png";
+		// Replace curseforge with minecraft.curseforge
+		let websiteURL = currentModData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
+		let removeMod = () => {
+			// TODO: dialog box
+			let index = currentModpack.CurseManifest.files.indexOf(currentMod);
+			if (index > -1) {
+				currentModpack.CurseManifest.files.splice(index, 1);
+			} else {
+				// display message
+			}
+			updateModList();
+		};
+
+		return hyperHTML.wire()`
+		<li class="list-group-item flex-row d-flex">
+			<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
+			<div class="flex-fill">
+				<div class="d-flex justify-content-between">
+					<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
+					<div>
+						<div role="group" aria-label="Client/Server selection" class="btn-group">
+							<button type="button" class="btn btn-sm btn-primary">Client</button>
+							<button type="button" class="btn btn-sm btn-primary">Server</button>
+						</div>
+						<button type="button" class="btn btn-outline-danger btn-sm" onclick="${removeMod}">Remove</button>
+					</div>
+				</div>
+				<p class="mb-1">${currentModData.Summary}</p>
+			</div>
+		</li>
+		`;
+	});
+}
+
+function loadEditor() {
+	renderForm();
 
 	// Request mod data for each mod
 	const modList = document.getElementById("modList");
-	const modListLink = document.getElementById("modListLink");
 	hyperHTML.bind(modList)`
 	<ul class="list-group">
 		${{
@@ -229,47 +304,10 @@ function renderForm() {
 					return;
 				}
 
-				modListLink.innerText = "Mod list (" + currentModpack.CurseManifest.files.length + " mods)";
-
-				return currentModpack.CurseManifest.files.sort((a, b) => {
-					// Push missing projects to the top
-					if (!data[a.projectID] || data[a.projectID].ErrorMessage) {
-						return -1;
-					} else if (!data[b.projectID] || data[b.projectID].ErrorMessage) {
-						return 1;
-					}
-					return data[a.projectID].Name.localeCompare(data[b.projectID].Name);
-				}).map(currentMod => {
-					let currentModData = data[currentMod.projectID];
-					if (!currentModData || currentModData.ErrorMessage) {
-						return hyperHTML.wire()`
-						<li class="list-group-item list-group-item-warning flex-row d-flex">
-							<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
-							<div class="flex-fill">
-								<h5 class="mb-1">An error occurred (project id ${currentMod.projectID})</h5>
-								<p class="mb-1">${currentModData ? currentModData.ErrorMessage : ""}</p>
-							</div>
-						</li>
-						`;
-					}
-
-					let iconURL = currentModData.IconURL ? currentModData.IconURL : "/MissingTexture.png";
-					// Replace curseforge with minecraft.curseforge
-					let websiteURL = currentModData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
-
-					return hyperHTML.wire()`
-					<li class="list-group-item flex-row d-flex">
-						<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
-						<div class="flex-fill">
-							<div class="d-flex justify-content-between">
-								<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
-								<small class="text-muted">3 days ago</small>
-							</div>
-							<p class="mb-1">${currentModData.Summary}</p>
-						</div>
-					</li>
-					`;
-				})
+				// Merge mod info list into current cache
+				cachedModInfoList = Object.assign(cachedModInfoList, data);
+				
+				return renderModListContent();
 			}).catch(function(error) {
 				logOpenError(error);
 			}),
@@ -314,7 +352,7 @@ openModpackButtonElement.addEventListener("click", () => {
 		}
 		showOpenSuccess(false);
 		currentModpack = data.Modpack;
-		renderForm();
+		loadEditor();
 	}).catch(function(error) {
 		logOpenError(error);
 	});
@@ -337,7 +375,7 @@ newModpackButtonElement.addEventListener("click", () => {
 		}
 		showOpenSuccess(true);
 		currentModpack = data.Modpack;
-		renderForm();
+		loadEditor();
 	}).catch(function(error) {
 		logOpenError(error);
 	});
@@ -364,7 +402,7 @@ reloadModpackButtonElement.addEventListener("click", () => {
 		}
 		showOpenSuccess(false);
 		currentModpack = data.Modpack;
-		renderForm();
+		loadEditor();
 	}).catch(function(error) {
 		logOpenError(error);
 	});
@@ -382,7 +420,7 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 	showOpenSuccess(false);
 	modpackLocationInput.value = data.Modpack.Folder;
 	currentModpack = data.Modpack;
-	renderForm();
+	loadEditor();
 }).catch(function(error) {
 	logOpenError(error);
 });
