@@ -1,5 +1,6 @@
 let currentModpack;
 let cachedModInfoList = {};
+let deleteConfirmation = null;
 
 // TODO: support SSC description?
 // TODO: support custom server config of mcVersion and forge?
@@ -259,15 +260,43 @@ function renderModListContent() {
 		// Replace curseforge with minecraft.curseforge
 		let websiteURL = currentModData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
 		let removeMod = () => {
-			// TODO: dialog box
-			let index = currentModpack.CurseManifest.files.indexOf(currentMod);
-			if (index > -1) {
-				currentModpack.CurseManifest.files.splice(index, 1);
-			} else {
-				// display message
-			}
+			deleteConfirmation = currentMod.projectID;
 			updateModList();
 		};
+
+		if (deleteConfirmation == currentMod.projectID) {
+			let removeModConfirm = () => {
+				deleteConfirmation = null;
+
+				let index = currentModpack.CurseManifest.files.indexOf(currentMod);
+				if (index > -1) {
+					currentModpack.CurseManifest.files.splice(index, 1);
+				} else {
+					// display message
+				}
+				updateModList();
+			};
+
+			let removeModCancel = () => {
+				deleteConfirmation = null;
+				updateModList();
+			};
+
+			// TODO: check deps
+			return hyperHTML.wire()`
+				<li class="list-group-item flex-row justify-content-between d-flex">
+					<div class="d-flex">
+						<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
+						<div>
+							<h5 class="mb-1">Are you sure?</h5>
+							<button type="button" class="btn btn-outline-danger btn-sm" onclick="${removeModConfirm}">Confirm</button>
+							<button type="button" class="btn btn-outline-secondary mx-1 btn-sm" onclick="${removeModCancel}">Cancel</button>
+						</div>
+					</div>
+					<p class="text-muted">No dependencies found</p>
+				</li>
+			`;
+		}
 
 		return hyperHTML.wire()`
 		<li class="list-group-item flex-row d-flex">
