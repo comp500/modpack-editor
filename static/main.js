@@ -343,6 +343,33 @@ newModpackButtonElement.addEventListener("click", () => {
 	});
 }, false);
 
+const reloadModpackButtonElement = document.getElementById("reloadModpackButton");
+reloadModpackButtonElement.addEventListener("click", () => {
+	if (!currentModpack) {
+		return;
+	}
+	modpackLocationInput.value = currentModpack.Folder;
+	fetch("/ajax/loadModpackFolder", {
+		method: "post",
+		headers: {
+			"Content-type": "application/json; charset=UTF-8"
+		},
+		body: JSON.stringify({
+			"Folder": currentModpack.Folder
+		})
+	}).then(response => response.json()).then(function(data) {
+		if (data.ErrorMessage) {
+			logOpenError(data.ErrorMessage);
+			return;
+		}
+		showOpenSuccess(false);
+		currentModpack = data.Modpack;
+		renderForm();
+	}).catch(function(error) {
+		logOpenError(error);
+	});
+}, false);
+
 // Load current modpack
 fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(function(data) {
 	if (data.ErrorMessage) {

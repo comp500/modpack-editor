@@ -119,6 +119,8 @@ func loadModpackFolder(w http.ResponseWriter, folder string) {
 	err = modpack.loadConfigFiles()
 	if err != nil {
 		writeError(w, err)
+		// Clear value
+		modpack = Modpack{}
 		return
 	}
 
@@ -174,6 +176,8 @@ func createModpackFolder(w http.ResponseWriter, folder string) {
 	err = modpack.loadConfigFiles()
 	if err != nil {
 		writeError(w, err)
+		// Clear value
+		modpack = Modpack{}
 		return
 	}
 

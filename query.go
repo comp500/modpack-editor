@@ -204,6 +204,8 @@ func loadEditorCache() {
 			if err != nil {
 				log.Print("Error loading modpack from cached folder:")
 				log.Print(err)
+				// Clear value
+				modpack = Modpack{}
 			}
 		}
 	} else if os.IsNotExist(err) {
