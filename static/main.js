@@ -234,18 +234,10 @@ function renderModListContent() {
 
 	modListLink.innerText = "Mod list (" + currentModpack.CurseManifest.files.length + " mods)";
 
-	return currentModpack.CurseManifest.files.sort((a, b) => {
-		// Push missing projects to the top
-		if (!cachedModInfoList[a.projectID] || cachedModInfoList[a.projectID].ErrorMessage) {
-			return -1;
-		} else if (!cachedModInfoList[b.projectID] || cachedModInfoList[b.projectID].ErrorMessage) {
-			return 1;
-		}
-		return cachedModInfoList[a.projectID].Name.localeCompare(cachedModInfoList[b.projectID].Name);
-	}).map(currentMod => {
+	return currentModpack.CurseManifest.files.map(currentMod => {
 		let currentModData = cachedModInfoList[currentMod.projectID];
 		if (!currentModData || currentModData.ErrorMessage) {
-			return hyperHTML.wire()`
+			return hyperHTML.wire(currentMod)`
 			<li class="list-group-item list-group-item-warning flex-row d-flex">
 				<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
 				<div class="flex-fill">
@@ -283,7 +275,7 @@ function renderModListContent() {
 			};
 
 			// TODO: check deps
-			return hyperHTML.wire()`
+			return hyperHTML.wire(currentMod)`
 				<li class="list-group-item flex-row justify-content-between d-flex">
 					<div class="d-flex">
 						<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
@@ -298,7 +290,7 @@ function renderModListContent() {
 			`;
 		}
 
-		return hyperHTML.wire()`
+		return hyperHTML.wire(currentMod)`
 		<li class="list-group-item flex-row d-flex">
 			<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
 			<div class="flex-fill">
@@ -335,6 +327,18 @@ function loadEditor() {
 
 				// Merge mod info list into current cache
 				cachedModInfoList = Object.assign(cachedModInfoList, data);
+
+				// Only sort when editor is loaded to improve performance on deletes/additions
+				// Use insertion sort when mods are being added
+				currentModpack.CurseManifest.files.sort((a, b) => {
+					// Push missing projects to the top
+					if (!cachedModInfoList[a.projectID] || cachedModInfoList[a.projectID].ErrorMessage) {
+						return -1;
+					} else if (!cachedModInfoList[b.projectID] || cachedModInfoList[b.projectID].ErrorMessage) {
+						return 1;
+					}
+					return cachedModInfoList[a.projectID].Name.localeCompare(cachedModInfoList[b.projectID].Name);
+				});
 				
 				return renderModListContent();
 			}).catch(function(error) {
