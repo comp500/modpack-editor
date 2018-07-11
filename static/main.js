@@ -181,6 +181,9 @@ const serverInputHandlers = [
 	}
 ];
 
+const generalSettingsBind = hyperHTML.bind(document.getElementById("generalSettings"));
+const serverSettingsBind = hyperHTML.bind(document.getElementById("serverSettings"));
+
 function renderForm() {
 	let inputHandlerWire = (handlers) => handlers.map(inputObject => {
 		let value = inputObject.get();
@@ -213,16 +216,14 @@ function renderForm() {
 		</div>`;
 	});
 
-	const generalSettings = document.getElementById("generalSettings");
-	hyperHTML.bind(generalSettings)`${inputHandlerWire(generalInputHandlers)}`;
-
-	const serverSettings = document.getElementById("serverSettings");
-	hyperHTML.bind(serverSettings)`${inputHandlerWire(serverInputHandlers)}`;
+	generalSettingsBind`${inputHandlerWire(generalInputHandlers)}`;
+	serverSettingsBind`${inputHandlerWire(serverInputHandlers)}`;
 }
 
+const modListBind = hyperHTML.bind(document.getElementById("modList"));
+
 function updateModList() {
-	const modList = document.getElementById("modList");
-	hyperHTML.bind(modList)`
+	modListBind`
 	<ul class="list-group">
 		${renderModListContent()}
 	</ul>
@@ -315,8 +316,7 @@ function loadEditor() {
 	renderForm();
 
 	// Request mod data for each mod
-	const modList = document.getElementById("modList");
-	hyperHTML.bind(modList)`
+	modListBind`
 	<ul class="list-group">
 		${{
 			any: fetch("/ajax/getModInfoList").then(response => response.json()).then(function(data) {
