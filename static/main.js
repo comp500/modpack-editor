@@ -1,4 +1,5 @@
 let currentModpack;
+let currentModList;
 let cachedModInfoList = {};
 let deleteConfirmation = null;
 
@@ -233,24 +234,9 @@ function updateModList() {
 function renderModListContent() {
 	const modListLink = document.getElementById("modListLink");
 
-	modListLink.innerText = "Mod list (" + currentModpack.CurseManifest.files.length + " mods)";
+	modListLink.innerText = "Mod list (" + currentModList.length + " mods)";
 
-	return currentModpack.CurseManifest.files
-		.concat(
-			// Add AdditionalFiles with curse download links
-			// TODO: make non-curse AdditonalFiles editable
-			currentModpack.ServerSetupConfig.Install.AdditionalFiles.filter(a => (a.URL.search(/https:\/\/minecraft.curseforge.com\/projects\/\w+\//) > -1))
-			.map(currentAdditionalFile => {
-				let slug = currentAdditionalFile.URL.match(/https:\/\/minecraft.curseforge.com\/projects\/(\w+)\//)[1];
-				let projectID = Object.keys(cachedModInfoList).find((projectID) => {
-					return cachedModInfoList[projectID].Slug == slug;
-				});
-				return {
-					projectID,
-					serverOnly: true
-				};
-			})
-		).map(currentMod => {
+	return currentModList.map(currentMod => {
 		let currentModData = cachedModInfoList[currentMod.projectID];
 		if (!currentModData || currentModData.ErrorMessage) {
 			return hyperHTML.wire(currentMod)`
@@ -276,11 +262,21 @@ function renderModListContent() {
 			let removeModConfirm = () => {
 				deleteConfirmation = null;
 
-				let index = currentModpack.CurseManifest.files.indexOf(currentMod);
+				let index = currentModList.indexOf(currentMod);
 				if (index > -1) {
-					currentModpack.CurseManifest.files.splice(index, 1);
+					currentModList.splice(index, 1);
+				}
+				if (currentMod.serverOnly) {
+					let index = currentModpack.ServerSetupConfig.Install.AdditionalFiles
+					.findIndex(a => (a.URL == currentMod.serverURL));
+					if (index > -1) {
+						currentModpack.ServerSetupConfig.Install.AdditionalFiles.splice(index, 1);
+					}
 				} else {
-					// display message
+					let index = currentModpack.CurseManifest.files.indexOf(currentMod);
+					if (index > -1) {
+						currentModpack.CurseManifest.files.splice(index, 1);
+					}
 				}
 				updateModList();
 			};
@@ -347,7 +343,23 @@ function loadEditor() {
 
 				// Only sort when editor is loaded to improve performance on deletes/additions
 				// Use insertion sort when mods are being added
-				currentModpack.CurseManifest.files.sort((a, b) => {
+				currentModList = currentModpack.CurseManifest.files
+				.concat(
+					// Add AdditionalFiles with curse download links
+					// TODO: make non-curse AdditonalFiles editable
+					currentModpack.ServerSetupConfig.Install.AdditionalFiles.filter(a => (a.URL.search(/https:\/\/minecraft.curseforge.com\/projects\/\w+\//) > -1))
+					.map(currentAdditionalFile => {
+						let slug = currentAdditionalFile.URL.match(/https:\/\/minecraft.curseforge.com\/projects\/(\w+)\//)[1];
+						let projectID = Object.keys(cachedModInfoList).find((projectID) => {
+							return cachedModInfoList[projectID].Slug == slug;
+						});
+						return {
+							projectID,
+							serverOnly: true,
+							serverURL: currentAdditionalFile.URL
+						};
+					})
+				).sort((a, b) => {
 					// Push missing projects to the top
 					if (!cachedModInfoList[a.projectID] || cachedModInfoList[a.projectID].ErrorMessage) {
 						return -1;

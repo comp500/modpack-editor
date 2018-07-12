@@ -283,7 +283,7 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 			// Decrement the counter when the goroutine completes.
 			defer wg.Done()
 
-			re := regexp.MustCompile("https://minecraft.curseforge.com/projects/(\\w+)/")
+			re := regexp.MustCompile("https://minecraft.curseforge.com/projects/([\\w\\-]+)/")
 			matches := re.FindSubmatch([]byte(projectURL))
 			if len(matches) < 2 {
 				// TODO: where is this output?
