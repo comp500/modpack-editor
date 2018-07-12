@@ -21,6 +21,7 @@ type Modpack struct {
 	Folder            string
 	CurseManifest     CurseManifest
 	ServerSetupConfig ServerSetupConfig
+	Mods              map[int]ModInfo
 }
 
 // CurseManifest is a curse manifest.json file
@@ -124,6 +125,8 @@ func loadModpackFolder(w http.ResponseWriter, folder string) {
 		modpack = Modpack{}
 		return
 	}
+	// Update mod list
+	modpack.getModInfoList()
 
 	// Update cache
 	writeEditorCache()
@@ -181,6 +184,8 @@ func createModpackFolder(w http.ResponseWriter, folder string) {
 		modpack = Modpack{}
 		return
 	}
+	// Create empty modlist
+	modpack.Mods = make(map[int]ModInfo)
 
 	// Update cache
 	writeEditorCache()
@@ -209,7 +214,6 @@ type ModInfo struct {
 	Name         string
 	IconURL      string
 	ErrorMessage error
-	// TODO: clientonly/serveronly
 	// TODO: Required?
 	// TODO: dates, rating, download counts?
 	// TODO: categories?
@@ -217,9 +221,11 @@ type ModInfo struct {
 	Summary    string
 	WebsiteURL string
 	Slug       string
+	OnClient   bool
+	OnServer   bool
 }
 
-func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
+func (m *Modpack) getModInfoList() {
 	info := make(map[int]ModInfo)
 	var wg sync.WaitGroup
 	// Mutex for the ModInfo map
@@ -258,6 +264,14 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 				iconURL = strings.Replace(iconURL, ".gif", "_animated.gif", 1)
 			}
 
+			onServer := true
+			for _, v := range m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject {
+				if v == projectID {
+					onServer = false
+					break
+				}
+			}
+
 			mutex.Lock()
 			info[projectID] = ModInfo{
 				Name:       data.Name,
@@ -265,6 +279,8 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 				Summary:    data.Summary,
 				WebsiteURL: data.WebsiteURL,
 				Slug:       data.Slug,
+				OnClient:   true,
+				OnServer:   onServer,
 			}
 			mutex.Unlock()
 		}(v.ProjectID)
@@ -323,6 +339,8 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 				Summary:    data.Summary,
 				WebsiteURL: data.WebsiteURL,
 				Slug:       data.Slug,
+				OnClient:   false,
+				OnServer:   true,
 			}
 			mutex.Unlock()
 		}(v.URL)
@@ -334,20 +352,5 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 	// Update cache
 	writeEditorCache()
 
-	return info, nil
-}
-
-func handleGetModInfoList(w http.ResponseWriter) {
-	if modpack.Folder == "" { // Empty modpack
-		json.NewEncoder(w).Encode(make(map[int]ModInfo))
-	} else {
-		info, err := modpack.getModInfoList()
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-
-		// Send the mod info list to the client
-		json.NewEncoder(w).Encode(&info)
-	}
+	m.Mods = info
 }

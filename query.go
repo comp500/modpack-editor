@@ -311,6 +311,8 @@ func loadEditorCache() {
 				// Clear value
 				modpack = Modpack{}
 			}
+			// Update mod list
+			modpack.getModInfoList()
 		}
 	} else if os.IsNotExist(err) {
 		cachedMods = make(map[int]AddonData)

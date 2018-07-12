@@ -1,7 +1,6 @@
 let currentModpack;
-let currentModList;
-let cachedModInfoList = {};
 let deleteConfirmation = null;
+let currentModKeysSorted = [];
 
 // TODO: support SSC description?
 // TODO: support custom server config of mcVersion and forge?
@@ -234,16 +233,16 @@ function updateModList() {
 function renderModListContent() {
 	const modListLink = document.getElementById("modListLink");
 
-	modListLink.innerText = "Mod list (" + currentModList.length + " mods)";
+	modListLink.innerText = "Mod list (" + currentModKeysSorted.length + " mods)";
 
-	return currentModList.map(currentMod => {
-		let currentModData = cachedModInfoList[currentMod.projectID];
+	return currentModKeysSorted.map(currentModID => {
+		let currentModData = currentModpack.Mods[currentModID];
 		if (!currentModData || currentModData.ErrorMessage) {
-			return hyperHTML.wire(currentMod)`
+			return hyperHTML.wire(currentModData)`
 			<li class="list-group-item list-group-item-warning flex-row d-flex">
 				<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
 				<div class="flex-fill">
-					<h5 class="mb-1">An error occurred (project id ${currentMod.projectID})</h5>
+					<h5 class="mb-1">An error occurred (project id ${currentModID})</h5>
 					<p class="mb-1">${currentModData ? currentModData.ErrorMessage : ""}</p>
 				</div>
 			</li>
@@ -254,30 +253,15 @@ function renderModListContent() {
 		// Replace curseforge with minecraft.curseforge
 		let websiteURL = currentModData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
 		let removeMod = () => {
-			deleteConfirmation = currentMod.projectID;
+			deleteConfirmation = currentModID;
 			updateModList();
 		};
 
-		if (deleteConfirmation == currentMod.projectID) {
+		if (deleteConfirmation == currentModID) {
 			let removeModConfirm = () => {
 				deleteConfirmation = null;
 
-				let index = currentModList.indexOf(currentMod);
-				if (index > -1) {
-					currentModList.splice(index, 1);
-				}
-				if (currentMod.serverOnly) {
-					let index = currentModpack.ServerSetupConfig.Install.AdditionalFiles
-					.findIndex(a => (a.URL == currentMod.serverURL));
-					if (index > -1) {
-						currentModpack.ServerSetupConfig.Install.AdditionalFiles.splice(index, 1);
-					}
-				} else {
-					let index = currentModpack.CurseManifest.files.indexOf(currentMod);
-					if (index > -1) {
-						currentModpack.CurseManifest.files.splice(index, 1);
-					}
-				}
+				currentModpack.Mods[currentModID] = undefined;
 				updateModList();
 			};
 
@@ -287,7 +271,7 @@ function renderModListContent() {
 			};
 
 			// TODO: check deps
-			return hyperHTML.wire(currentMod)`
+			return hyperHTML.wire(currentModData)`
 				<li class="list-group-item flex-row justify-content-between d-flex">
 					<div class="d-flex">
 						<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
@@ -302,52 +286,33 @@ function renderModListContent() {
 			`;
 		}
 
-		let isServer = currentModpack.ServerSetupConfig.Install.FormatSpecific.IgnoreProject.indexOf(currentMod.projectID) == -1;
 		let toggleClient = () => {
-			if (currentMod.serverOnly) {
-				// enable client
-				currentMod.serverOnly = false;
-				currentModpack.CurseManifest.files.push(currentMod);
-			} else {
+			if (currentModData.OnClient) {
 				// disable client
 				// if server is disabled, enable server
-				currentMod.serverOnly = true;
-				let index = currentModpack.CurseManifest.files.indexOf(currentMod);
-				if (index > -1) {
-					currentModpack.CurseManifest.files.splice(index, 1);
-				}
-				if (!isServer) {
-					toggleServer();
-					return;
-				}
+				currentModData.OnClient = false;
+				currentModData.OnServer = true;
+			} else {
+				// enable client
+				currentModData.OnClient = true;
 			}
 			updateModList();
 		};
 
 		let toggleServer = () => {
-			if (isServer) {
+			if (currentModData.OnServer) {
 				// disable server
 				// if client is disabled, enable client
-				let index = currentModpack.ServerSetupConfig.Install.AdditionalFiles
-				.findIndex(a => (a.URL == currentMod.serverURL));
-				if (index > -1) {
-					currentModpack.ServerSetupConfig.Install.AdditionalFiles.splice(index, 1);
-				}
-				if (currentMod.serverOnly) {
-					toggleClient();
-					return;
-				}
+				currentModData.OnServer = false;
+				currentModData.OnClient = true;
 			} else {
 				// enable server
-				// TODO: get destination somehow
-				currentModpack.ServerSetupConfig.Install.AdditionalFiles.push({
-					URL: currentMod.serverURL
-				});
+				currentModData.OnServer = true;
 			}
 			updateModList();
 		};
 
-		return hyperHTML.wire(currentMod)`
+		return hyperHTML.wire(currentModData)`
 		<li class="list-group-item flex-row d-flex">
 			<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
 			<div class="flex-fill">
@@ -355,8 +320,8 @@ function renderModListContent() {
 					<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
 					<div>
 						<div role="group" aria-label="Client/Server selection" class="btn-group">
-							<button type="button" class="${"btn btn-sm " + (currentMod.serverOnly ? "btn-outline-primary": "btn-primary")}" onclick="${toggleClient}">Client</button>
-							<button type="button" class="${"btn btn-sm " + (isServer ? "btn-primary": "btn-outline-primary")}" onclick="${toggleServer}">Server</button>
+							<button type="button" class="${"btn btn-sm " + (currentModData.OnClient ? "btn-primary": "btn-outline-primary")}" onclick="${toggleClient}">Client</button>
+							<button type="button" class="${"btn btn-sm " + (currentModData.OnServer ? "btn-primary": "btn-outline-primary")}" onclick="${toggleServer}">Server</button>
 						</div>
 						<button type="button" class="btn btn-outline-danger btn-sm" onclick="${removeMod}">Remove</button>
 					</div>
@@ -375,46 +340,22 @@ function loadEditor() {
 	modListBind`
 	<ul class="list-group">
 		${{
-			any: fetch("/ajax/getModInfoList").then(response => response.json()).then(function(data) {
-				if (data.ErrorMessage) {
-					logOpenError(data.ErrorMessage);
-					return;
-				}
-
-				// Merge mod info list into current cache
-				cachedModInfoList = Object.assign(cachedModInfoList, data);
+			any: new Promise((resolve, reject) => {
+				currentModKeysSorted = Object.keys(currentModpack.Mods);
 
 				// Only sort when editor is loaded to improve performance on deletes/additions
 				// Use insertion sort when mods are being added
-				currentModList = currentModpack.CurseManifest.files
-				.concat(
-					// Add AdditionalFiles with curse download links
-					// TODO: make non-curse AdditonalFiles editable
-					currentModpack.ServerSetupConfig.Install.AdditionalFiles.filter(a => (a.URL.search(/https:\/\/minecraft.curseforge.com\/projects\/\w+\//) > -1))
-					.map(currentAdditionalFile => {
-						let slug = currentAdditionalFile.URL.match(/https:\/\/minecraft.curseforge.com\/projects\/(\w+)\//)[1];
-						let projectID = Object.keys(cachedModInfoList).find((projectID) => {
-							return cachedModInfoList[projectID].Slug == slug;
-						});
-						return {
-							projectID,
-							serverOnly: true,
-							serverURL: currentAdditionalFile.URL
-						};
-					})
-				).sort((a, b) => {
+				currentModKeysSorted.sort((a, b) => {
 					// Push missing projects to the top
-					if (!cachedModInfoList[a.projectID] || cachedModInfoList[a.projectID].ErrorMessage) {
+					if (!currentModpack.Mods[a] || currentModpack.Mods[a].ErrorMessage) {
 						return -1;
-					} else if (!cachedModInfoList[b.projectID] || cachedModInfoList[b.projectID].ErrorMessage) {
+					} else if (!currentModpack.Mods[b] || currentModpack.Mods[b].ErrorMessage) {
 						return 1;
 					}
-					return cachedModInfoList[a.projectID].Name.localeCompare(cachedModInfoList[b.projectID].Name);
+					return currentModpack.Mods[a].Name.localeCompare(currentModpack.Mods[b].Name);
 				});
 				
-				return renderModListContent();
-			}).catch(function(error) {
-				logOpenError(error);
+				resolve(renderModListContent());
 			}),
 			placeholder: "Loading mod list..."
 		}}
