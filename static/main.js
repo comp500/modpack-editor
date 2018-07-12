@@ -303,6 +303,49 @@ function renderModListContent() {
 		}
 
 		let isServer = currentModpack.ServerSetupConfig.Install.FormatSpecific.IgnoreProject.indexOf(currentMod.projectID) == -1;
+		let toggleClient = () => {
+			if (currentMod.serverOnly) {
+				// enable client
+				currentMod.serverOnly = false;
+				currentModpack.CurseManifest.files.push(currentMod);
+			} else {
+				// disable client
+				// if server is disabled, enable server
+				currentMod.serverOnly = true;
+				let index = currentModpack.CurseManifest.files.indexOf(currentMod);
+				if (index > -1) {
+					currentModpack.CurseManifest.files.splice(index, 1);
+				}
+				if (!isServer) {
+					toggleServer();
+					return;
+				}
+			}
+			updateModList();
+		};
+
+		let toggleServer = () => {
+			if (isServer) {
+				// disable server
+				// if client is disabled, enable client
+				let index = currentModpack.ServerSetupConfig.Install.AdditionalFiles
+				.findIndex(a => (a.URL == currentMod.serverURL));
+				if (index > -1) {
+					currentModpack.ServerSetupConfig.Install.AdditionalFiles.splice(index, 1);
+				}
+				if (currentMod.serverOnly) {
+					toggleClient();
+					return;
+				}
+			} else {
+				// enable server
+				// TODO: get destination somehow
+				currentModpack.ServerSetupConfig.Install.AdditionalFiles.push({
+					URL: currentMod.serverURL
+				});
+			}
+			updateModList();
+		};
 
 		return hyperHTML.wire(currentMod)`
 		<li class="list-group-item flex-row d-flex">
@@ -312,8 +355,8 @@ function renderModListContent() {
 					<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
 					<div>
 						<div role="group" aria-label="Client/Server selection" class="btn-group">
-							<button type="button" class="${"btn btn-sm " + (currentMod.serverOnly ? "btn-outline-primary": "btn-primary")}">Client</button>
-							<button type="button" class="${"btn btn-sm " + (isServer ? "btn-primary": "btn-outline-primary")}">Server</button>
+							<button type="button" class="${"btn btn-sm " + (currentMod.serverOnly ? "btn-outline-primary": "btn-primary")}" onclick="${toggleClient}">Client</button>
+							<button type="button" class="${"btn btn-sm " + (isServer ? "btn-primary": "btn-outline-primary")}" onclick="${toggleServer}">Server</button>
 						</div>
 						<button type="button" class="btn btn-outline-danger btn-sm" onclick="${removeMod}">Remove</button>
 					</div>
