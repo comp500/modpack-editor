@@ -235,7 +235,22 @@ function renderModListContent() {
 
 	modListLink.innerText = "Mod list (" + currentModpack.CurseManifest.files.length + " mods)";
 
-	return currentModpack.CurseManifest.files.map(currentMod => {
+	return currentModpack.CurseManifest.files
+		.concat(
+			// Add AdditionalFiles with curse download links
+			// TODO: make non-curse AdditonalFiles editable
+			currentModpack.ServerSetupConfig.Install.AdditionalFiles.filter(a => (a.URL.search(/https:\/\/minecraft.curseforge.com\/projects\/\w+\//) > -1))
+			.map(currentAdditionalFile => {
+				let slug = currentAdditionalFile.URL.match(/https:\/\/minecraft.curseforge.com\/projects\/(\w+)\//)[1];
+				let projectID = Object.keys(cachedModInfoList).find((projectID) => {
+					return cachedModInfoList[projectID].Slug == slug;
+				});
+				return {
+					projectID,
+					serverOnly: true
+				};
+			})
+		).map(currentMod => {
 		let currentModData = cachedModInfoList[currentMod.projectID];
 		if (!currentModData || currentModData.ErrorMessage) {
 			return hyperHTML.wire(currentMod)`
@@ -291,6 +306,8 @@ function renderModListContent() {
 			`;
 		}
 
+		let isServer = currentModpack.ServerSetupConfig.Install.FormatSpecific.IgnoreProject.indexOf(currentMod.projectID) == -1;
+
 		return hyperHTML.wire(currentMod)`
 		<li class="list-group-item flex-row d-flex">
 			<img src="${iconURL}" class="img-thumbnail modIcon mr-2">
@@ -299,8 +316,8 @@ function renderModListContent() {
 					<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
 					<div>
 						<div role="group" aria-label="Client/Server selection" class="btn-group">
-							<button type="button" class="btn btn-sm btn-primary">Client</button>
-							<button type="button" class="btn btn-sm btn-primary">Server</button>
+							<button type="button" class="${"btn btn-sm " + (currentMod.serverOnly ? "btn-outline-primary": "btn-primary")}">Client</button>
+							<button type="button" class="${"btn btn-sm " + (isServer ? "btn-primary": "btn-outline-primary")}">Server</button>
 						</div>
 						<button type="button" class="btn btn-outline-danger btn-sm" onclick="${removeMod}">Remove</button>
 					</div>

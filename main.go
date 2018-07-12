@@ -60,6 +60,10 @@ func addonHandlerSlug(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update cache
+	// TODO: do this only on change
+	writeEditorCache()
+
 	err = json.NewEncoder(w).Encode(data)
 	if err != nil {
 		// may have already written to output?
@@ -83,6 +87,7 @@ func addonHandlerID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update cache
+	// TODO: do this only on change
 	writeEditorCache()
 
 	err = json.NewEncoder(w).Encode(data)

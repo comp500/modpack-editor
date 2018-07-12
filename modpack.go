@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -215,6 +216,7 @@ type ModInfo struct {
 	// TODO: author(s)?
 	Summary    string
 	WebsiteURL string
+	Slug       string
 }
 
 func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
@@ -238,6 +240,7 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 					ErrorMessage: err,
 				}
 				mutex.Unlock()
+				return
 			}
 
 			var iconURL string
@@ -261,9 +264,68 @@ func (m *Modpack) getModInfoList() (map[int]ModInfo, error) {
 				IconURL:    iconURL,
 				Summary:    data.Summary,
 				WebsiteURL: data.WebsiteURL,
+				Slug:       data.Slug,
 			}
 			mutex.Unlock()
 		}(v.ProjectID)
+	}
+
+	for _, v := range m.ServerSetupConfig.Install.AdditionalFiles {
+		// Ignore non-curseforge download links
+		if !strings.HasPrefix(v.URL, "https://minecraft.curseforge.com/projects/") {
+			continue
+		}
+
+		// Increment the WaitGroup counter.
+		wg.Add(1)
+
+		go func(projectURL string) {
+			// Decrement the counter when the goroutine completes.
+			defer wg.Done()
+
+			re := regexp.MustCompile("https://minecraft.curseforge.com/projects/(\\w+)/")
+			matches := re.FindSubmatch([]byte(projectURL))
+			if len(matches) < 2 {
+				// TODO: where is this output?
+				return
+			}
+			slug := string(matches[1])
+
+			data, err := requestAddonDataFromSlug(slug)
+			if err != nil {
+				mutex.Lock()
+				// TODO: where is this output?
+				/*info[] = ModInfo{
+					ErrorMessage: err,
+				}*/
+				mutex.Unlock()
+			}
+
+			var iconURL string
+			// Loop through attachments, set iconURL to one which is set to true
+			// Replace size in url (256/256) to 62/62
+			for _, v := range data.Attachments {
+				if !v.Default {
+					continue
+				}
+				// TODO: move replacement to JS?
+				iconURL = strings.Replace(v.ThumbnailURL, "256/256", "62/62", 1)
+				// Curseforge does this for gifs for some reason...
+				// TODO: Find out when it does this somehow.
+				// Informational Accessories doesn't do this, but AE2 and Hwyla and Clumps do.
+				iconURL = strings.Replace(iconURL, ".gif", "_animated.gif", 1)
+			}
+
+			mutex.Lock()
+			info[data.ID] = ModInfo{
+				Name:       data.Name,
+				IconURL:    iconURL,
+				Summary:    data.Summary,
+				WebsiteURL: data.WebsiteURL,
+				Slug:       data.Slug,
+			}
+			mutex.Unlock()
+		}(v.URL)
 	}
 
 	// Wait for all HTTP fetches to complete.
