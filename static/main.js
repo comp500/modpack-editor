@@ -261,7 +261,11 @@ function renderModListContent() {
 			let removeModConfirm = () => {
 				deleteConfirmation = null;
 
-				currentModpack.Mods[currentModID] = undefined;
+				delete currentModpack.Mods[currentModID];
+				let index = currentModKeysSorted.indexOf(currentModID);
+				if (index > -1) {
+					currentModKeysSorted.splice(index, 1);
+				}
 				updateModList();
 			};
 
@@ -320,8 +324,8 @@ function renderModListContent() {
 					<h5 class="mb-1"><a href="${websiteURL}">${currentModData.Name}</a></h5>
 					<div>
 						<div role="group" aria-label="Client/Server selection" class="btn-group">
-							<button type="button" class="${"btn btn-sm " + (currentModData.OnClient ? "btn-primary": "btn-outline-primary")}" onclick="${toggleClient}">Client</button>
-							<button type="button" class="${"btn btn-sm " + (currentModData.OnServer ? "btn-primary": "btn-outline-primary")}" onclick="${toggleServer}">Server</button>
+							<button type="button" class="${"btn btn-sm " + (currentModData.OnClient ? "btn-primary active": "btn-outline-primary")}" onclick="${toggleClient}">Client</button>
+							<button type="button" class="${"btn btn-sm " + (currentModData.OnServer ? "btn-primary active": "btn-outline-primary")}" onclick="${toggleServer}">Server</button>
 						</div>
 						<button type="button" class="btn btn-outline-danger btn-sm" onclick="${removeMod}">Remove</button>
 					</div>
