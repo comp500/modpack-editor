@@ -20,6 +20,8 @@ var blankPackBox packr.Box
 var modpack Modpack
 var cachedMods map[int]AddonData
 var cachedModsMutex sync.RWMutex
+var cachedSlugIDs map[string]int
+var cachedSlugIDsMutex sync.RWMutex
 var disableCacheStore bool
 
 type postRequestData struct {
@@ -48,7 +50,25 @@ func ajaxHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func addonHandler(w http.ResponseWriter, r *http.Request) {
+func addonHandlerSlug(w http.ResponseWriter, r *http.Request) {
+	// Get addon slug from /addonSlug/mod-name
+	slug := r.URL.Path[7:]
+
+	data, err := requestAddonDataFromSlug(slug)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
+		// may have already written to output?
+		writeError(w, err)
+		return
+	}
+}
+
+func addonHandlerID(w http.ResponseWriter, r *http.Request) {
 	// Get addon id from /addon/12345
 	addonID, err := strconv.Atoi(r.URL.Path[7:])
 	if err != nil {
@@ -91,7 +111,8 @@ func main() {
 
 	http.Handle("/", http.FileServer(staticFilesBox))
 	http.HandleFunc("/ajax/", ajaxHandler)
-	http.HandleFunc("/addon/", addonHandler)
+	http.HandleFunc("/addon/", addonHandlerSlug)
+	http.HandleFunc("/addonSlug/", addonHandlerID)
 	err := http.ListenAndServe(fmt.Sprintf("%s:%d", *ip, *port), nil)
 	if err != nil {
 		log.Println("Error starting server:")

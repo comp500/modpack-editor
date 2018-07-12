@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -149,9 +151,100 @@ func requestAddonData(addonID int) (AddonData, error) {
 	return data, nil
 }
 
+// AddonSlugRequest is sent to the CurseProxy GraphQL api to get the id from a slug
+type AddonSlugRequest struct {
+	Query     string `json:"query"`
+	Variables struct {
+		Slug string `json:"slug"`
+	} `json:"variables"`
+}
+
+// AddonSlugResponse is received from the CurseProxy GraphQL api to get the id from a slug
+type AddonSlugResponse struct {
+	Data struct {
+		Addons []struct {
+			ID int `json:"id"`
+		} `json:"addons"`
+	} `json:"data"`
+	Exception  string   `json:"exception"`
+	Message    string   `json:"message"`
+	Stacktrace []string `json:"stacktrace"`
+}
+
+func requestAddonDataFromSlug(slug string) (AddonData, error) {
+	// Use a cached slug id, if it exists
+	cachedSlugIDsMutex.RLock()
+	if id, ok := cachedSlugIDs[slug]; ok {
+		cachedSlugIDsMutex.RUnlock()
+		return requestAddonData(id)
+	}
+	cachedSlugIDsMutex.RUnlock()
+
+	var data AddonData
+
+	request := AddonSlugRequest{
+		Query: `
+		query getIDFromSlug($slug: String) {
+			{
+				addons(slug: $slug) {
+					id
+				}
+			}
+		}
+		`,
+	}
+	request.Variables.Slug = slug
+
+	// Uses the curse.nikky.moe api
+	var response AddonSlugResponse
+	client := &http.Client{}
+
+	requestBytes, err := json.Marshal(request)
+	if err != nil {
+		return data, err
+	}
+
+	req, err := http.NewRequest("POST", "https://curse.nikky.moe/graphql", bytes.NewBuffer(requestBytes))
+	if err != nil {
+		return data, err
+	}
+
+	req.Header.Set("User-Agent", "comp500/modpack-editor client")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return data, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil && err != io.EOF {
+		return data, err
+	}
+
+	if len(response.Exception) > 0 || len(response.Message) > 0 {
+		return data, fmt.Errorf("Error requesting id for slug: %s", response.Message)
+	}
+
+	if len(response.Data.Addons) < 1 {
+		return data, errors.New("Addon not found")
+	}
+
+	data, err = requestAddonData(response.Data.Addons[0].ID)
+	if err != nil {
+		return data, err
+	}
+	// If the request succeeded, cache the ID
+	cachedSlugIDsMutex.Lock()
+	cachedSlugIDs[slug] = response.Data.Addons[0].ID
+	cachedSlugIDsMutex.Unlock()
+	return data, err
+}
+
 // ModpackEditorCache is saved and loaded from disk
 type ModpackEditorCache struct {
 	CachedMods        map[int]AddonData
+	CachedSlugIDs     map[string]int
 	LastOpenedModpack string
 	CacheVersion      int
 }
@@ -162,6 +255,7 @@ const CurrentCacheVersion = 2
 func loadEditorCache() {
 	if disableCacheStore {
 		cachedMods = make(map[int]AddonData)
+		cachedSlugIDs = make(map[string]int)
 		return
 	}
 
@@ -174,6 +268,7 @@ func loadEditorCache() {
 			log.Print("Error loading from cache:")
 			log.Print(err)
 			cachedMods = make(map[int]AddonData)
+			cachedSlugIDs = make(map[string]int)
 			return
 		}
 		err = gob.NewDecoder(zr).Decode(&modpackEditorCache)
@@ -181,16 +276,25 @@ func loadEditorCache() {
 			log.Print("Error loading from cache:")
 			log.Print(err)
 			cachedMods = make(map[int]AddonData)
+			cachedSlugIDs = make(map[string]int)
 			return
 		}
 
 		if modpackEditorCache.CacheVersion < CurrentCacheVersion {
 			log.Print("Cache is too old, discarding")
 			cachedMods = make(map[int]AddonData)
+			cachedSlugIDs = make(map[string]int)
 			return
 		}
 
 		cachedMods = modpackEditorCache.CachedMods
+		if cachedMods == nil {
+			cachedMods = make(map[int]AddonData)
+		}
+		cachedSlugIDs = modpackEditorCache.CachedSlugIDs
+		if cachedSlugIDs == nil {
+			cachedSlugIDs = make(map[string]int)
+		}
 		if len(modpackEditorCache.LastOpenedModpack) > 0 && modpack.Folder == "" {
 			folderAbsolute, err := filepath.Abs(modpackEditorCache.LastOpenedModpack)
 			if err != nil {
@@ -210,6 +314,7 @@ func loadEditorCache() {
 		}
 	} else if os.IsNotExist(err) {
 		cachedMods = make(map[int]AddonData)
+		cachedSlugIDs = make(map[string]int)
 	} else {
 		log.Print("Error loading from cache:")
 		log.Print(err)
@@ -223,6 +328,8 @@ func writeEditorCache() {
 
 	cachedModsMutex.RLock()
 	defer cachedModsMutex.RUnlock()
+	cachedSlugIDsMutex.RLock()
+	defer cachedSlugIDsMutex.RUnlock()
 
 	file, err := os.Create("modpackEditorCache.bin")
 	if err != nil {
@@ -234,6 +341,7 @@ func writeEditorCache() {
 
 	modpackEditorCache := ModpackEditorCache{
 		CachedMods:        cachedMods,
+		CachedSlugIDs:     cachedSlugIDs,
 		LastOpenedModpack: modpack.Folder,
 		CacheVersion:      CurrentCacheVersion,
 	}
