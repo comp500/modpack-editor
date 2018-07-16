@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -223,6 +226,7 @@ type ModInfo struct {
 	Slug       string
 	OnClient   bool
 	OnServer   bool
+	FileID     int
 }
 
 func (m *Modpack) getModInfoList() {
@@ -235,7 +239,7 @@ func (m *Modpack) getModInfoList() {
 		// Increment the WaitGroup counter.
 		wg.Add(1)
 
-		go func(projectID int) {
+		go func(projectID, fileID int) {
 			// Decrement the counter when the goroutine completes.
 			defer wg.Done()
 
@@ -281,9 +285,10 @@ func (m *Modpack) getModInfoList() {
 				Slug:       data.Slug,
 				OnClient:   true,
 				OnServer:   onServer,
+				FileID:     fileID,
 			}
 			mutex.Unlock()
-		}(v.ProjectID)
+		}(v.ProjectID, v.FileID)
 	}
 
 	for _, v := range m.ServerSetupConfig.Install.AdditionalFiles {
@@ -299,22 +304,27 @@ func (m *Modpack) getModInfoList() {
 			// Decrement the counter when the goroutine completes.
 			defer wg.Done()
 
-			re := regexp.MustCompile("https://minecraft.curseforge.com/projects/([\\w\\-]+)/")
+			re := regexp.MustCompile("https://minecraft.curseforge.com/projects/([\\w\\-]+)/files/(\\d+)/")
 			matches := re.FindSubmatch([]byte(projectURL))
-			if len(matches) < 2 {
+			if len(matches) < 3 {
 				// TODO: where is this output?
 				return
 			}
 			slug := string(matches[1])
+			fileID, err := strconv.Atoi(string(matches[2]))
+			if err != nil {
+				return
+			}
 
 			data, err := requestAddonDataFromSlug(slug)
 			if err != nil {
-				mutex.Lock()
+				/*mutex.Lock()
 				// TODO: where is this output?
-				/*info[] = ModInfo{
+				info[] = ModInfo{
 					ErrorMessage: err,
-				}*/
-				mutex.Unlock()
+				}
+				mutex.Unlock()*/
+				return
 			}
 
 			var iconURL string
@@ -341,6 +351,7 @@ func (m *Modpack) getModInfoList() {
 				Slug:       data.Slug,
 				OnClient:   false,
 				OnServer:   true,
+				FileID:     fileID,
 			}
 			mutex.Unlock()
 		}(v.URL)
@@ -353,4 +364,219 @@ func (m *Modpack) getModInfoList() {
 	writeEditorCache()
 
 	m.Mods = info
+}
+
+func (m *Modpack) syncCurseKeyMap(shouldExist bool, projectID, fileID int, curseKeyMap map[int]int) {
+	// Does the project exist in the manifest?
+	if key, ok := curseKeyMap[projectID]; ok {
+		if shouldExist {
+			// Modify
+			if m.CurseManifest.Files[key].FileID != fileID {
+				fmt.Println("Updated curse id")
+				m.CurseManifest.Files[key].FileID = fileID
+			}
+		} else {
+			// Delete (from SliceTricks)
+			m.CurseManifest.Files = append(m.CurseManifest.Files[:key], m.CurseManifest.Files[key+1:]...)
+			fmt.Println("Deleted curse id")
+		}
+	} else if shouldExist {
+		// Add
+		m.CurseManifest.Files = append(m.CurseManifest.Files, struct {
+			ProjectID int  `json:"projectID"`
+			FileID    int  `json:"fileID"`
+			Required  bool `json:"required"`
+		}{projectID, fileID, true})
+		fmt.Println("Added curse id")
+	}
+	// If !exists and !shouldExist, ignore
+	// Delete from keyMap
+	delete(curseKeyMap, projectID)
+}
+
+func (m *Modpack) syncIgnoreProjectKeyMap(shouldExist bool, projectID int, ignoreProjectKeyMap map[int]int) {
+	// Does the project exist in the manifest?
+	if key, ok := ignoreProjectKeyMap[projectID]; ok {
+		if shouldExist {
+			// Nothing to do here
+		} else {
+			// Delete (from SliceTricks)
+			m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject = append(m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[:key], m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[key+1:]...)
+			fmt.Println("Deleted ignore")
+		}
+	} else if shouldExist {
+		// Add
+		m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject = append(m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject, projectID)
+		fmt.Println("Added ignore")
+	}
+	// If !exists and !shouldExist, ignore
+	// Delete from keyMap
+	delete(ignoreProjectKeyMap, projectID)
+}
+
+func (m *Modpack) syncAdditionalFilesSlugMap(shouldExist bool, slug string, fileID int, additionalFilesSlugMap map[string]int) {
+	// Does the project exist in the manifest?
+	if key, ok := additionalFilesSlugMap[slug]; ok {
+		if shouldExist {
+			// Modify
+			re := regexp.MustCompile("https://minecraft.curseforge.com/projects/([\\w\\-]+)/files/(\\d+)/")
+			matches := re.FindSubmatch([]byte(m.ServerSetupConfig.Install.AdditionalFiles[key].URL))
+			if len(matches) < 3 {
+				// TODO: throw an error?
+				return
+			}
+			oldFileID, err := strconv.Atoi(string(matches[2]))
+			if err != nil {
+				return
+			}
+
+			if oldFileID != fileID {
+				// TODO: AAAAA WHERE DO WE GET THE DESTINATION
+				fmt.Println("Aaaaa (normal)")
+			}
+		} else {
+			// Delete (from SliceTricks)
+			m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles[:key], m.ServerSetupConfig.Install.AdditionalFiles[key+1:]...)
+			fmt.Println("Deleted additional file")
+		}
+	} else if shouldExist {
+		// Add
+		// TODO: AAAAA WHERE DO WE GET THE DESTINATION
+		/*m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles, struct {
+			URL string
+			Destination string
+		}{})*/
+		fmt.Println("Aaaa (bad)")
+	}
+	// If !exists and !shouldExist, ignore
+	// Delete from slugMap
+	delete(additionalFilesSlugMap, slug)
+}
+
+// This function is painful.
+func (m *Modpack) updateModLists() error {
+	// Update the CurseManifest and ServerSetupConfig with the changes in m.Mods
+	// while preserving the order of each array
+
+	// I did this because diffs.
+
+	// keyMaps are used to map the project IDs to array indexes
+	curseKeyMap := make(map[int]int)
+	for i, v := range m.CurseManifest.Files {
+		curseKeyMap[v.ProjectID] = i
+	}
+	ignoreProjectKeyMap := make(map[int]int)
+	for i, v := range m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject {
+		ignoreProjectKeyMap[v] = i
+	}
+	// additionalFilesSlugMap is used for additionalFiles
+	additionalFilesSlugMap := make(map[string]int)
+	for i, v := range m.ServerSetupConfig.Install.AdditionalFiles {
+		if !strings.HasPrefix(v.URL, "https://minecraft.curseforge.com/projects/") {
+			continue
+		}
+
+		re := regexp.MustCompile("https://minecraft.curseforge.com/projects/([\\w\\-]+)/")
+		matches := re.FindSubmatch([]byte(v.URL))
+		if len(matches) < 2 {
+			return fmt.Errorf("Could not match slug from project URL: %s", v.URL)
+		}
+		slug := string(matches[1])
+
+		additionalFilesSlugMap[slug] = i
+	}
+
+	for projectID, v := range m.Mods {
+		if v.OnClient {
+			// Must be in curseKeyMap
+			m.syncCurseKeyMap(true, projectID, v.FileID, curseKeyMap)
+			// Must not be in additionalFilesSlugMap
+			m.syncAdditionalFilesSlugMap(false, v.Slug, v.FileID, additionalFilesSlugMap)
+			if v.OnServer {
+				// Must not be in ignoreProjectKeyMap
+				m.syncIgnoreProjectKeyMap(false, projectID, ignoreProjectKeyMap)
+			} else {
+				// Must be in ignoreProjectKeyMap
+				m.syncIgnoreProjectKeyMap(true, projectID, ignoreProjectKeyMap)
+			}
+		} else if v.OnServer {
+			// Must not be in curseKeyMap
+			m.syncCurseKeyMap(false, projectID, v.FileID, curseKeyMap)
+			// Must not be in ignoreProjectKeyMap
+			m.syncIgnoreProjectKeyMap(false, projectID, ignoreProjectKeyMap)
+			// Must be in additionalFilesSlugMap
+			m.syncAdditionalFilesSlugMap(true, v.Slug, v.FileID, additionalFilesSlugMap)
+		} else {
+			return fmt.Errorf("Mod is not on server or client: %d", projectID)
+		}
+	}
+
+	for _, v := range curseKeyMap {
+		// Delete (from SliceTricks)
+		m.CurseManifest.Files = append(m.CurseManifest.Files[:v], m.CurseManifest.Files[v+1:]...)
+	}
+
+	for _, v := range ignoreProjectKeyMap {
+		// Delete (from SliceTricks)
+		m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject = append(m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[:v], m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[v+1:]...)
+	}
+
+	for _, v := range additionalFilesSlugMap {
+		// Delete (from SliceTricks)
+		m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles[:v], m.ServerSetupConfig.Install.AdditionalFiles[v+1:]...)
+	}
+
+	return nil
+}
+
+func (m *Modpack) saveConfigFiles() error {
+	manifest, err := json.Marshal(&m.CurseManifest)
+	if err != nil {
+		return err
+	}
+
+	var manifestBuffer bytes.Buffer
+	json.Indent(&manifestBuffer, manifest, "", "  ")
+
+	f, err := os.Create(filepath.Join(m.Folder, "manifest.json"))
+	if err != nil {
+		return err
+	}
+	_, err = manifestBuffer.WriteTo(f)
+	if err != nil {
+		return err
+	}
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+
+	config, err := yaml.Marshal(&m.ServerSetupConfig)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(filepath.Join(m.Folder, "server-setup-config.yaml"), config, 0664)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func saveModpack(w http.ResponseWriter, newPack Modpack) {
+	modpack = newPack
+
+	err := modpack.updateModLists()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	err = modpack.saveConfigFiles()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	json.NewEncoder(w).Encode(struct{}{})
 }

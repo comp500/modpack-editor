@@ -240,7 +240,7 @@ function renderModListContent() {
 		if (!currentModData || currentModData.ErrorMessage) {
 			return hyperHTML.wire(currentModData)`
 			<li class="list-group-item list-group-item-warning flex-row d-flex">
-				<img src="/MissingTexture.png" class="img-thumbnail modIcon mr-2">
+				<img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" class="img-thumbnail modIcon mr-2">
 				<div class="flex-fill">
 					<h5 class="mb-1">An error occurred (project id ${currentModID})</h5>
 					<p class="mb-1">${currentModData ? currentModData.ErrorMessage : ""}</p>
@@ -249,7 +249,7 @@ function renderModListContent() {
 			`;
 		}
 
-		let iconURL = currentModData.IconURL ? currentModData.IconURL : "/MissingTexture.png";
+		let iconURL = currentModData.IconURL ? currentModData.IconURL : "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 		// Replace curseforge with minecraft.curseforge
 		let websiteURL = currentModData.WebsiteURL.replace("www.curseforge.com/minecraft/mc-mods/", "minecraft.curseforge.com/projects/");
 		let removeMod = () => {
@@ -370,21 +370,35 @@ function loadEditor() {
 	editor.classList.remove("d-none");
 }
 
-const openMessagesElement = document.getElementById("openMessages");
+const statusElement = document.getElementById("status");
 
 function logOpenError(message) {
-	openMessagesElement.innerText = "Error while opening: " + message;
-	openMessagesElement.className = "text-danger";
+	statusElement.innerText = "Error while opening: " + message;
+	statusElement.className = "text-danger";
+	console.error(message);
+}
+
+function logSaveError(message) {
+	statusElement.innerText = "Error while saving: " + message;
+	statusElement.className = "text-danger";
 	console.error(message);
 }
 
 function showOpenSuccess(isCreated) {
-	openMessagesElement.innerText = isCreated ? "Successfully created modpack!" : "Successfully opened modpack!";
-	openMessagesElement.className = "text-success";
+	statusElement.innerText = isCreated ? "Successfully created modpack!" : "Successfully opened modpack!";
+	statusElement.className = "text-success";
+	reloadModpackButtonElement.disabled = false;
+	saveModpackButtonElement.disabled = false;
+}
+
+function showSaveSuccess() {
+	statusElement.innerText = "Successfully saved modpack!";
+	statusElement.className = "text-success";
 }
 
 // Modpack opening UI
 const modpackLocationInput = document.getElementById("modpackLocation");
+const saveModpackButtonElement = document.getElementById("saveModpackButton");
 const openModpackButtonElement = document.getElementById("openModpackButton");
 openModpackButtonElement.addEventListener("click", () => {
 	fetch("/ajax/loadModpackFolder", {
@@ -474,6 +488,32 @@ fetch("/ajax/getCurrentPackDetails").then(response => response.json()).then(func
 }).catch(function(error) {
 	logOpenError(error);
 });
+
+// Save modpack
+saveModpackButtonElement.addEventListener("click", () => {
+	if (currentModpack == null) {
+		logSaveError("Must open a modpack to save it.")
+		return;
+	}
+
+	fetch("/ajax/saveModpack", {
+		method: "post",
+		headers: {
+			"Content-type": "application/json; charset=UTF-8"
+		},
+		body: JSON.stringify({
+			"Modpack": currentModpack
+		})
+	}).then(response => response.json()).then(function(data) {
+		if (data.ErrorMessage) {
+			logSaveError(data.ErrorMessage);
+			return;
+		}
+		showSaveSuccess();
+	}).catch(function(error) {
+		logSaveError(error);
+	});
+}, false);
 
 // Tabbed UI
 function createTabbedUI(tabs, links) {

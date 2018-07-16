@@ -25,7 +25,8 @@ var cachedSlugIDsMutex sync.RWMutex
 var disableCacheStore bool
 
 type postRequestData struct {
-	Folder string
+	Folder  string
+	Modpack Modpack
 }
 
 func ajaxHandler(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +44,8 @@ func ajaxHandler(w http.ResponseWriter, r *http.Request) {
 		loadModpackFolder(w, data.Folder)
 	case "/ajax/createModpackFolder":
 		createModpackFolder(w, data.Folder)
+	case "/ajax/saveModpack":
+		saveModpack(w, data.Modpack)
 	default:
 		w.WriteHeader(404)
 	}
