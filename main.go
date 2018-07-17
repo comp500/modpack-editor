@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gobuffalo/packr"
 )
@@ -15,6 +16,7 @@ import (
 var staticFilesBox packr.Box
 var blankPackBox packr.Box
 var modpack Modpack
+var modpackMutex sync.RWMutex
 var disableCacheStore bool
 
 type postRequestData struct {
@@ -102,7 +104,12 @@ func main() {
 	blankPackBox = packr.NewBox("./blankPack")
 	disableCacheStore = *nocache
 
-	loadEditorCache()
+	loadedModpack := loadEditorCache()
+	if loadedModpack != nil {
+		modpackMutex.Lock()
+		modpack = *loadedModpack
+		modpackMutex.Unlock()
+	}
 
 	fmt.Println("Welcome to modpack-editor!")
 	fmt.Printf("Listening on port %d, accessible at http://%s:%d/\n", *port, *ip, *port)

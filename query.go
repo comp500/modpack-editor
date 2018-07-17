@@ -149,19 +149,62 @@ func requestAddonData(addonID int) (AddonData, error) {
 	}
 
 	// Add files to file cache
-	mainCache.cachedFilesMutex.Lock()
+	mainCache.cachedFilesMutex.RLock()
 	for _, v := range data.LatestFiles {
 		if _, ok := mainCache.CachedFiles[v.ID]; !ok {
+			mainCache.cachedFilesMutex.Lock()
 			mainCache.CachedFiles[v.ID] = v
+			mainCache.cachedFilesMutex.Unlock()
 		}
 	}
-	mainCache.cachedFilesMutex.Unlock()
+	mainCache.cachedFilesMutex.RUnlock()
 
 	// Add to cache
 	data.LastQueried = time.Now()
 	mainCache.cachedModsMutex.Lock()
 	mainCache.CachedMods[addonID] = data
 	mainCache.cachedModsMutex.Unlock()
+	return data, nil
+}
+
+func requestFileData(addonID, fileID int) (FileData, error) {
+	// Use a cached file, if it's available and up to date
+	mainCache.cachedFilesMutex.RLock()
+	if mainCache.CachedFiles[fileID].Available {
+		defer mainCache.cachedFilesMutex.RUnlock()
+		return mainCache.CachedFiles[fileID], nil
+	}
+	mainCache.cachedFilesMutex.RUnlock()
+
+	// Uses the curse.nikky.moe api
+	var data FileData
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://curse.nikky.moe/api/addon/%d/file/%d", addonID, fileID), nil)
+	if err != nil {
+		return data, err
+	}
+
+	req.Header.Set("User-Agent", "comp500/modpack-editor client")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return data, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&data)
+	if err != nil && err != io.EOF {
+		return data, err
+	}
+
+	// TODO: dependencies?
+	// may need to do this per project and cannot cache it
+
+	// Add to cache
+	mainCache.cachedFilesMutex.Lock()
+	mainCache.CachedFiles[fileID] = data
+	mainCache.cachedFilesMutex.Unlock()
 	return data, nil
 }
 
@@ -255,6 +298,76 @@ func requestAddonDataFromSlug(slug string) (AddonData, error) {
 	return data, err
 }
 
+func requestFileDataFromSlug(slug string, fileID int) (FileData, error) {
+	// Use a cached slug id, if it exists
+	mainCache.cachedSlugIDsMutex.RLock()
+	if id, ok := mainCache.CachedSlugIDs[slug]; ok {
+		mainCache.cachedSlugIDsMutex.RUnlock()
+		return requestFileData(id, fileID)
+	}
+	mainCache.cachedSlugIDsMutex.RUnlock()
+
+	var data FileData
+
+	request := AddonSlugRequest{
+		Query: `
+		query getIDFromSlug($slug: String) {
+			{
+				addons(slug: $slug) {
+					id
+				}
+			}
+		}
+		`,
+	}
+	request.Variables.Slug = slug
+
+	// Uses the curse.nikky.moe api
+	var response AddonSlugResponse
+	client := &http.Client{}
+
+	requestBytes, err := json.Marshal(request)
+	if err != nil {
+		return data, err
+	}
+
+	req, err := http.NewRequest("POST", "https://curse.nikky.moe/graphql", bytes.NewBuffer(requestBytes))
+	if err != nil {
+		return data, err
+	}
+
+	req.Header.Set("User-Agent", "comp500/modpack-editor client")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return data, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil && err != io.EOF {
+		return data, err
+	}
+
+	if len(response.Exception) > 0 || len(response.Message) > 0 {
+		return data, fmt.Errorf("Error requesting id for slug: %s", response.Message)
+	}
+
+	if len(response.Data.Addons) < 1 {
+		return data, errors.New("Addon not found")
+	}
+
+	data, err = requestFileData(response.Data.Addons[0].ID, fileID)
+	if err != nil {
+		return data, err
+	}
+	// If the request succeeded, cache the ID
+	mainCache.cachedSlugIDsMutex.Lock()
+	mainCache.CachedSlugIDs[slug] = response.Data.Addons[0].ID
+	mainCache.cachedSlugIDsMutex.Unlock()
+	return data, err
+}
+
 var mainCache ModpackEditorCache
 
 // ModpackEditorCache is saved and loaded from disk
@@ -283,10 +396,10 @@ func NewModpackEditorCache() *ModpackEditorCache {
 // CurrentCacheVersion is the version of the editor cache file being used. Older caches are ignored.
 const CurrentCacheVersion = 3
 
-func loadEditorCache() {
+func loadEditorCache() *Modpack {
 	if disableCacheStore {
 		mainCache = *NewModpackEditorCache()
-		return
+		return nil
 	}
 
 	file, err := os.Open("modpackEditorCache.bin")
@@ -298,20 +411,20 @@ func loadEditorCache() {
 			log.Print("Error loading from cache:")
 			log.Print(err)
 			mainCache = *NewModpackEditorCache()
-			return
+			return nil
 		}
 		err = gob.NewDecoder(zr).Decode(&newModpackEditorCache)
 		if err != nil && err != io.EOF {
 			log.Print("Error loading from cache:")
 			log.Print(err)
 			mainCache = *NewModpackEditorCache()
-			return
+			return nil
 		}
 
 		if newModpackEditorCache.CacheVersion < CurrentCacheVersion {
 			log.Print("Cache is too old, discarding")
 			mainCache = *NewModpackEditorCache()
-			return
+			return nil
 		}
 
 		// Can't assign directly as it contains mutexes
@@ -333,24 +446,26 @@ func loadEditorCache() {
 		}
 
 		// Load existing modpack
-		if len(mainCache.LastOpenedModpack) > 0 && modpack.Folder == "" {
+		if len(mainCache.LastOpenedModpack) > 0 {
 			folderAbsolute, err := filepath.Abs(mainCache.LastOpenedModpack)
 			if err != nil {
 				log.Print("Error loading modpack from cached folder:")
 				log.Print(err)
-				return
+				return nil
 			}
 
-			modpack = Modpack{Folder: folderAbsolute}
-			err = modpack.loadConfigFiles()
+			newModpack := Modpack{Folder: folderAbsolute}
+			err = newModpack.loadConfigFiles()
 			if err != nil {
 				log.Print("Error loading modpack from cached folder:")
 				log.Print(err)
 				// Clear value
-				modpack = Modpack{}
+				newModpack = Modpack{}
 			}
 			// Update mod list
-			modpack.getModInfoList()
+			newModpack.getModInfoList()
+
+			return &newModpack
 		}
 	} else if os.IsNotExist(err) {
 		mainCache = *NewModpackEditorCache()
@@ -358,6 +473,8 @@ func loadEditorCache() {
 		log.Print("Error loading from cache:")
 		log.Print(err)
 	}
+
+	return nil
 }
 
 func writeEditorCache() {

@@ -120,6 +120,9 @@ func loadModpackFolder(w http.ResponseWriter, folder string) {
 		return
 	}
 
+	modpackMutex.Lock()
+	defer modpackMutex.Unlock()
+
 	modpack = Modpack{Folder: folderAbsolute}
 	err = modpack.loadConfigFiles()
 	if err != nil {
@@ -179,6 +182,9 @@ func createModpackFolder(w http.ResponseWriter, folder string) {
 		return
 	}
 
+	modpackMutex.Lock()
+	defer modpackMutex.Unlock()
+
 	modpack = Modpack{Folder: folderAbsolute}
 	err = modpack.loadConfigFiles()
 	if err != nil {
@@ -200,6 +206,9 @@ func createModpackFolder(w http.ResponseWriter, folder string) {
 }
 
 func getCurrentPackDetails(w io.Writer) {
+	modpackMutex.RLock()
+	defer modpackMutex.RUnlock()
+
 	if modpack.Folder == "" { // Empty modpack
 		json.NewEncoder(w).Encode(struct {
 			Modpack []byte
@@ -372,6 +381,7 @@ func (m *Modpack) syncCurseKeyMap(shouldExist bool, projectID, fileID int, curse
 		if shouldExist {
 			// Modify
 			if m.CurseManifest.Files[key].FileID != fileID {
+				fmt.Printf("old %d new %d\n", m.CurseManifest.Files[key].FileID, fileID)
 				fmt.Println("Updated curse id")
 				m.CurseManifest.Files[key].FileID = fileID
 			}
@@ -379,6 +389,12 @@ func (m *Modpack) syncCurseKeyMap(shouldExist bool, projectID, fileID int, curse
 			// Delete (from SliceTricks)
 			m.CurseManifest.Files = append(m.CurseManifest.Files[:key], m.CurseManifest.Files[key+1:]...)
 			fmt.Println("Deleted curse id")
+			// Shift every key down
+			for i, v := range curseKeyMap {
+				if v > key {
+					curseKeyMap[i] = v - 1
+				}
+			}
 		}
 	} else if shouldExist {
 		// Add
@@ -403,6 +419,12 @@ func (m *Modpack) syncIgnoreProjectKeyMap(shouldExist bool, projectID int, ignor
 			// Delete (from SliceTricks)
 			m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject = append(m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[:key], m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[key+1:]...)
 			fmt.Println("Deleted ignore")
+			// Shift every key down
+			for i, v := range ignoreProjectKeyMap {
+				if v > key {
+					ignoreProjectKeyMap[i] = v - 1
+				}
+			}
 		}
 	} else if shouldExist {
 		// Add
@@ -431,22 +453,46 @@ func (m *Modpack) syncAdditionalFilesSlugMap(shouldExist bool, slug string, file
 			}
 
 			if oldFileID != fileID {
-				// TODO: AAAAA WHERE DO WE GET THE DESTINATION
-				fmt.Println("Aaaaa (normal)")
+				fmt.Println("modified additonalFile")
+
+				downloadURL := fmt.Sprintf("https://minecraft.curseforge.com/projects/%s/files/%d/download", slug, fileID)
+				fileInfo, err := requestFileDataFromSlug(slug, fileID)
+				if err != nil {
+					return
+				}
+				destination := fmt.Sprintf("mods/%s", fileInfo.FileNameOnDisk)
+
+				m.ServerSetupConfig.Install.AdditionalFiles[key] = struct {
+					URL         string `yaml:"url"`
+					Destination string `yaml:"destination"`
+				}{downloadURL, destination}
 			}
 		} else {
 			// Delete (from SliceTricks)
 			m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles[:key], m.ServerSetupConfig.Install.AdditionalFiles[key+1:]...)
 			fmt.Println("Deleted additional file")
+			// Shift every key down
+			for i, v := range additionalFilesSlugMap {
+				if v > key {
+					additionalFilesSlugMap[i] = v - 1
+				}
+			}
 		}
 	} else if shouldExist {
 		// Add
-		// TODO: AAAAA WHERE DO WE GET THE DESTINATION
-		/*m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles, struct {
-			URL string
-			Destination string
-		}{})*/
-		fmt.Println("Aaaa (bad)")
+		fmt.Println("added additonalFile")
+
+		downloadURL := fmt.Sprintf("https://minecraft.curseforge.com/projects/%s/files/%d/download", slug, fileID)
+		fileInfo, err := requestFileDataFromSlug(slug, fileID)
+		if err != nil {
+			return
+		}
+		destination := fmt.Sprintf("mods/%s", fileInfo.FileNameOnDisk)
+
+		m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles, struct {
+			URL         string `yaml:"url"`
+			Destination string `yaml:"destination"`
+		}{downloadURL, destination})
 	}
 	// If !exists and !shouldExist, ignore
 	// Delete from slugMap
@@ -567,6 +613,8 @@ func (m *Modpack) saveConfigFiles() error {
 }
 
 func saveModpack(w http.ResponseWriter, newPack Modpack) {
+	modpackMutex.Lock()
+	defer modpackMutex.Unlock()
 	modpack = newPack
 
 	err := modpack.updateModLists()
