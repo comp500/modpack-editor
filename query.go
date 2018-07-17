@@ -149,15 +149,13 @@ func requestAddonData(addonID int) (AddonData, error) {
 	}
 
 	// Add files to file cache
-	mainCache.cachedFilesMutex.RLock()
+	mainCache.cachedFilesMutex.Lock()
 	for _, v := range data.LatestFiles {
 		if _, ok := mainCache.CachedFiles[v.ID]; !ok {
-			mainCache.cachedFilesMutex.Lock()
 			mainCache.CachedFiles[v.ID] = v
-			mainCache.cachedFilesMutex.Unlock()
 		}
 	}
-	mainCache.cachedFilesMutex.RUnlock()
+	mainCache.cachedFilesMutex.Unlock()
 
 	// Add to cache
 	data.LastQueried = time.Now()
@@ -454,18 +452,18 @@ func loadEditorCache() *Modpack {
 				return nil
 			}
 
-			newModpack := Modpack{Folder: folderAbsolute}
+			newModpack := &Modpack{Folder: folderAbsolute}
 			err = newModpack.loadConfigFiles()
 			if err != nil {
 				log.Print("Error loading modpack from cached folder:")
 				log.Print(err)
 				// Clear value
-				newModpack = Modpack{}
+				newModpack = nil
 			}
 			// Update mod list
 			newModpack.getModInfoList()
 
-			return &newModpack
+			return newModpack
 		}
 	} else if os.IsNotExist(err) {
 		mainCache = *NewModpackEditorCache()
