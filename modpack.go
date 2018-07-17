@@ -230,12 +230,20 @@ type ModInfo struct {
 	// TODO: dates, rating, download counts?
 	// TODO: categories?
 	// TODO: author(s)?
-	Summary    string
-	WebsiteURL string
-	Slug       string
-	OnClient   bool
-	OnServer   bool
-	FileID     int
+	Summary      string
+	WebsiteURL   string
+	Slug         string
+	OnClient     bool
+	OnServer     bool
+	FileID       int
+	Dependencies []struct {
+		AddonID int    `json:"addOnId"`
+		Type    string `json:"type"`
+	}
+	Dependants []struct {
+		AddonID int    `json:"addOnId"`
+		Type    string `json:"type"`
+	}
 }
 
 func (m *Modpack) getModInfoList() {
@@ -285,16 +293,27 @@ func (m *Modpack) getModInfoList() {
 				}
 			}
 
+			fileInfo, err := requestFileData(projectID, fileID)
+			if err != nil {
+				mutex.Lock()
+				info[projectID] = ModInfo{
+					ErrorMessage: err,
+				}
+				mutex.Unlock()
+				return
+			}
+
 			mutex.Lock()
 			info[projectID] = ModInfo{
-				Name:       data.Name,
-				IconURL:    iconURL,
-				Summary:    data.Summary,
-				WebsiteURL: data.WebsiteURL,
-				Slug:       data.Slug,
-				OnClient:   true,
-				OnServer:   onServer,
-				FileID:     fileID,
+				Name:         data.Name,
+				IconURL:      iconURL,
+				Summary:      data.Summary,
+				WebsiteURL:   data.WebsiteURL,
+				Slug:         data.Slug,
+				OnClient:     true,
+				OnServer:     onServer,
+				FileID:       fileID,
+				Dependencies: fileInfo.Dependencies,
 			}
 			mutex.Unlock()
 		}(v.ProjectID, v.FileID)
@@ -351,16 +370,27 @@ func (m *Modpack) getModInfoList() {
 				iconURL = strings.Replace(iconURL, ".gif", "_animated.gif", 1)
 			}
 
+			fileInfo, err := requestFileData(data.ID, fileID)
+			if err != nil {
+				mutex.Lock()
+				info[data.ID] = ModInfo{
+					ErrorMessage: err,
+				}
+				mutex.Unlock()
+				return
+			}
+
 			mutex.Lock()
 			info[data.ID] = ModInfo{
-				Name:       data.Name,
-				IconURL:    iconURL,
-				Summary:    data.Summary,
-				WebsiteURL: data.WebsiteURL,
-				Slug:       data.Slug,
-				OnClient:   false,
-				OnServer:   true,
-				FileID:     fileID,
+				Name:         data.Name,
+				IconURL:      iconURL,
+				Summary:      data.Summary,
+				WebsiteURL:   data.WebsiteURL,
+				Slug:         data.Slug,
+				OnClient:     false,
+				OnServer:     true,
+				FileID:       fileID,
+				Dependencies: fileInfo.Dependencies,
 			}
 			mutex.Unlock()
 		}(v.URL)
@@ -371,6 +401,30 @@ func (m *Modpack) getModInfoList() {
 
 	// Update cache
 	writeEditorCache()
+
+	// After modInfos are populated, calculate dependants
+	for depProjectID, v := range info {
+		for _, dep := range v.Dependencies {
+			if p, ok := info[dep.AddonID]; ok {
+				if p.Dependants == nil {
+					p.Dependants = make([]struct {
+						AddonID int    `json:"addOnId"`
+						Type    string `json:"type"`
+					}, 1)
+					p.Dependants[0] = struct {
+						AddonID int    `json:"addOnId"`
+						Type    string `json:"type"`
+					}{depProjectID, dep.Type}
+				} else {
+					p.Dependants = append(info[dep.AddonID].Dependants, struct {
+						AddonID int    `json:"addOnId"`
+						Type    string `json:"type"`
+					}{depProjectID, dep.Type})
+				}
+				info[dep.AddonID] = p
+			}
+		}
+	}
 
 	m.Mods = info
 }
