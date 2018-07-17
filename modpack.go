@@ -513,16 +513,19 @@ func (m *Modpack) updateModLists() error {
 
 	for _, v := range curseKeyMap {
 		// Delete (from SliceTricks)
+		fmt.Println("delete from curse")
 		m.CurseManifest.Files = append(m.CurseManifest.Files[:v], m.CurseManifest.Files[v+1:]...)
 	}
 
 	for _, v := range ignoreProjectKeyMap {
 		// Delete (from SliceTricks)
+		fmt.Println("delete from ignore")
 		m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject = append(m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[:v], m.ServerSetupConfig.Install.FormatSpecific.IgnoreProject[v+1:]...)
 	}
 
 	for _, v := range additionalFilesSlugMap {
 		// Delete (from SliceTricks)
+		fmt.Println("delete from additional")
 		m.ServerSetupConfig.Install.AdditionalFiles = append(m.ServerSetupConfig.Install.AdditionalFiles[:v], m.ServerSetupConfig.Install.AdditionalFiles[v+1:]...)
 	}
 

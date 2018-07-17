@@ -8,20 +8,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/gobuffalo/packr"
 )
 
-const port = 8080
-
 var staticFilesBox packr.Box
 var blankPackBox packr.Box
 var modpack Modpack
-var cachedMods map[int]AddonData
-var cachedModsMutex sync.RWMutex
-var cachedSlugIDs map[string]int
-var cachedSlugIDsMutex sync.RWMutex
 var disableCacheStore bool
 
 type postRequestData struct {

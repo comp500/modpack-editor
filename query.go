@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -38,32 +39,11 @@ type AddonData struct {
 	DefaultFileID int    `json:"defaultFileId"`
 	CommentCount  int    `json:"commentCount"`
 	// Should be float format because for some reason the field is given using e
-	DownloadCount float64 `json:"downloadCount"`
-	Rating        int     `json:"rating"`
-	InstallCount  int     `json:"installCount"`
-	LatestFiles   []struct {
-		ID              int    `json:"id"`
-		FileName        string `json:"fileName"`
-		FileNameOnDisk  string `json:"fileNameOnDisk"`
-		FileDate        int64  `json:"fileDate"`
-		ReleaseType     string `json:"releaseType"`
-		FileStatus      string `json:"fileStatus"`
-		DownloadURL     string `json:"downloadURL"`
-		AlternateFileID int    `json:"alternateFileId"`
-		Dependencies    []struct {
-			AddonID int    `json:"addOnId"`
-			Type    string `json:"type"`
-		} `json:"dependencies"`
-		Modules []struct {
-			Fingerprint int64  `json:"fingerprint"`
-			Foldername  string `json:"foldername"`
-		} `json:"modules"`
-		PackageFingerprint int64    `json:"packageFingerprint"`
-		GameVersion        []string `json:"gameVersion"`
-		Alternate          bool     `json:"alternate"`
-		Available          bool     `json:"available"`
-	} `json:"latestFiles"`
-	Categories []struct {
+	DownloadCount float64   `json:"downloadCount"`
+	Rating        int       `json:"rating"`
+	InstallCount  int       `json:"installCount"`
+	LatestFiles   []ModData `json:"latestFiles"`
+	Categories    []struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 		URL  string `json:"url"`
@@ -110,16 +90,41 @@ type AddonData struct {
 	LastQueried time.Time
 }
 
+// ModData is deserialised JSON from the curse.nikky.moe API
+// Can be provided in a seperate request or in LatestFiles
+type ModData struct {
+	ID              int    `json:"id"`
+	FileName        string `json:"fileName"`
+	FileNameOnDisk  string `json:"fileNameOnDisk"`
+	FileDate        int64  `json:"fileDate"`
+	ReleaseType     string `json:"releaseType"`
+	FileStatus      string `json:"fileStatus"`
+	DownloadURL     string `json:"downloadURL"`
+	AlternateFileID int    `json:"alternateFileId"`
+	Dependencies    []struct {
+		AddonID int    `json:"addOnId"`
+		Type    string `json:"type"`
+	} `json:"dependencies"`
+	Modules []struct {
+		Fingerprint int64  `json:"fingerprint"`
+		Foldername  string `json:"foldername"`
+	} `json:"modules"`
+	PackageFingerprint int64    `json:"packageFingerprint"`
+	GameVersion        []string `json:"gameVersion"`
+	Alternate          bool     `json:"alternate"`
+	Available          bool     `json:"available"`
+}
+
 func requestAddonData(addonID int) (AddonData, error) {
 	// Use a cached mod, if it's available and up to date
-	cachedModsMutex.RLock()
-	if cachedMods[addonID].Available {
-		if time.Since(cachedMods[addonID].LastQueried) < 48*time.Hour {
-			defer cachedModsMutex.RUnlock()
-			return cachedMods[addonID], nil
+	modpackEditorCache.cachedModsMutex.RLock()
+	if modpackEditorCache.CachedMods[addonID].Available {
+		if time.Since(modpackEditorCache.CachedMods[addonID].LastQueried) < 48*time.Hour {
+			defer modpackEditorCache.cachedModsMutex.RUnlock()
+			return modpackEditorCache.CachedMods[addonID], nil
 		}
 	}
-	cachedModsMutex.RUnlock()
+	modpackEditorCache.cachedModsMutex.RUnlock()
 
 	// Uses the curse.nikky.moe api
 	var data AddonData
@@ -145,9 +150,9 @@ func requestAddonData(addonID int) (AddonData, error) {
 
 	// Add to cache
 	data.LastQueried = time.Now()
-	cachedModsMutex.Lock()
-	cachedMods[addonID] = data
-	cachedModsMutex.Unlock()
+	modpackEditorCache.cachedModsMutex.Lock()
+	modpackEditorCache.CachedMods[addonID] = data
+	modpackEditorCache.cachedModsMutex.Unlock()
 	return data, nil
 }
 
@@ -173,12 +178,12 @@ type AddonSlugResponse struct {
 
 func requestAddonDataFromSlug(slug string) (AddonData, error) {
 	// Use a cached slug id, if it exists
-	cachedSlugIDsMutex.RLock()
-	if id, ok := cachedSlugIDs[slug]; ok {
-		cachedSlugIDsMutex.RUnlock()
+	modpackEditorCache.cachedSlugIDsMutex.RLock()
+	if id, ok := modpackEditorCache.CachedSlugIDs[slug]; ok {
+		modpackEditorCache.cachedSlugIDsMutex.RUnlock()
 		return requestAddonData(id)
 	}
-	cachedSlugIDsMutex.RUnlock()
+	modpackEditorCache.cachedSlugIDsMutex.RUnlock()
 
 	var data AddonData
 
@@ -235,66 +240,83 @@ func requestAddonDataFromSlug(slug string) (AddonData, error) {
 		return data, err
 	}
 	// If the request succeeded, cache the ID
-	cachedSlugIDsMutex.Lock()
-	cachedSlugIDs[slug] = response.Data.Addons[0].ID
-	cachedSlugIDsMutex.Unlock()
+	modpackEditorCache.cachedSlugIDsMutex.Lock()
+	modpackEditorCache.CachedSlugIDs[slug] = response.Data.Addons[0].ID
+	modpackEditorCache.cachedSlugIDsMutex.Unlock()
 	return data, err
 }
 
+var modpackEditorCache ModpackEditorCache
+
 // ModpackEditorCache is saved and loaded from disk
 type ModpackEditorCache struct {
-	CachedMods        map[int]AddonData
-	CachedSlugIDs     map[string]int
-	LastOpenedModpack string
-	CacheVersion      int
+	CachedMods         map[int]AddonData
+	cachedModsMutex    sync.RWMutex
+	CachedSlugIDs      map[string]int
+	cachedSlugIDsMutex sync.RWMutex
+	LastOpenedModpack  string
+	CacheVersion       int
+}
+
+// NewModpackEditorCache initialises the maps in ModpackEditorCache
+func NewModpackEditorCache() *ModpackEditorCache {
+	cache := ModpackEditorCache{
+		CachedMods:    make(map[int]AddonData),
+		CachedSlugIDs: make(map[string]int),
+		CacheVersion:  CurrentCacheVersion,
+	}
+	return &cache
 }
 
 // CurrentCacheVersion is the version of the editor cache file being used. Older caches are ignored.
-const CurrentCacheVersion = 2
+const CurrentCacheVersion = 3
 
 func loadEditorCache() {
 	if disableCacheStore {
-		cachedMods = make(map[int]AddonData)
-		cachedSlugIDs = make(map[string]int)
+		modpackEditorCache = *NewModpackEditorCache()
 		return
 	}
 
 	file, err := os.Open("modpackEditorCache.bin")
 	if err == nil {
 		defer file.Close()
-		var modpackEditorCache ModpackEditorCache
+		var newModpackEditorCache ModpackEditorCache
 		zr, err := gzip.NewReader(file)
 		if err != nil {
 			log.Print("Error loading from cache:")
 			log.Print(err)
-			cachedMods = make(map[int]AddonData)
-			cachedSlugIDs = make(map[string]int)
+			modpackEditorCache = *NewModpackEditorCache()
 			return
 		}
-		err = gob.NewDecoder(zr).Decode(&modpackEditorCache)
+		err = gob.NewDecoder(zr).Decode(&newModpackEditorCache)
 		if err != nil && err != io.EOF {
 			log.Print("Error loading from cache:")
 			log.Print(err)
-			cachedMods = make(map[int]AddonData)
-			cachedSlugIDs = make(map[string]int)
+			modpackEditorCache = *NewModpackEditorCache()
 			return
 		}
 
-		if modpackEditorCache.CacheVersion < CurrentCacheVersion {
+		if newModpackEditorCache.CacheVersion < CurrentCacheVersion {
 			log.Print("Cache is too old, discarding")
-			cachedMods = make(map[int]AddonData)
-			cachedSlugIDs = make(map[string]int)
+			modpackEditorCache = *NewModpackEditorCache()
 			return
 		}
 
-		cachedMods = modpackEditorCache.CachedMods
-		if cachedMods == nil {
-			cachedMods = make(map[int]AddonData)
+		// Can't assign directly as it contains mutexes
+		modpackEditorCache = ModpackEditorCache{
+			CachedMods:        newModpackEditorCache.CachedMods,
+			CachedSlugIDs:     newModpackEditorCache.CachedSlugIDs,
+			LastOpenedModpack: newModpackEditorCache.LastOpenedModpack,
+			CacheVersion:      CurrentCacheVersion,
 		}
-		cachedSlugIDs = modpackEditorCache.CachedSlugIDs
-		if cachedSlugIDs == nil {
-			cachedSlugIDs = make(map[string]int)
+		if newModpackEditorCache.CachedMods == nil {
+			modpackEditorCache.CachedMods = make(map[int]AddonData)
 		}
+		if newModpackEditorCache.CachedSlugIDs == nil {
+			modpackEditorCache.CachedSlugIDs = make(map[string]int)
+		}
+
+		// Load existing modpack
 		if len(modpackEditorCache.LastOpenedModpack) > 0 && modpack.Folder == "" {
 			folderAbsolute, err := filepath.Abs(modpackEditorCache.LastOpenedModpack)
 			if err != nil {
@@ -315,8 +337,7 @@ func loadEditorCache() {
 			modpack.getModInfoList()
 		}
 	} else if os.IsNotExist(err) {
-		cachedMods = make(map[int]AddonData)
-		cachedSlugIDs = make(map[string]int)
+		modpackEditorCache = *NewModpackEditorCache()
 	} else {
 		log.Print("Error loading from cache:")
 		log.Print(err)
@@ -328,10 +349,14 @@ func writeEditorCache() {
 		return
 	}
 
-	cachedModsMutex.RLock()
-	defer cachedModsMutex.RUnlock()
-	cachedSlugIDsMutex.RLock()
-	defer cachedSlugIDsMutex.RUnlock()
+	// Ensure mutexes are correct for gob to encode the maps
+	modpackEditorCache.cachedModsMutex.RLock()
+	defer modpackEditorCache.cachedModsMutex.RUnlock()
+	modpackEditorCache.cachedSlugIDsMutex.RLock()
+	defer modpackEditorCache.cachedSlugIDsMutex.RUnlock()
+
+	// Update lastOpenedModpack
+	modpackEditorCache.LastOpenedModpack = modpack.Folder
 
 	file, err := os.Create("modpackEditorCache.bin")
 	if err != nil {
@@ -341,12 +366,6 @@ func writeEditorCache() {
 	}
 	defer file.Close()
 
-	modpackEditorCache := ModpackEditorCache{
-		CachedMods:        cachedMods,
-		CachedSlugIDs:     cachedSlugIDs,
-		LastOpenedModpack: modpack.Folder,
-		CacheVersion:      CurrentCacheVersion,
-	}
 	zw := gzip.NewWriter(file)
 	defer zw.Close()
 	err = gob.NewEncoder(zw).Encode(&modpackEditorCache)
