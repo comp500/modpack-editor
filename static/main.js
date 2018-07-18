@@ -278,11 +278,11 @@ function renderModListContent() {
 				const typeCased = dep.type.charAt(0).toUpperCase() + dep.type.slice(1).toLowerCase();
 				if (currentModpack.Mods[dep.addOnId]) {
 					return hyperHTML.wire(dep)`
-						<li>${currentModpack.Mods[dep.addOnId].Name} (${typeCased})</li>
+						<li class="${typeCased == "Optional" ? "text-muted" : ""}">${currentModpack.Mods[dep.addOnId].Name} (${typeCased})</li>
 					`;
 				} else {
 					return hyperHTML.wire(dep)`
-						<li>Mod ${dep.addOnId} removed (${typeCased})</li>
+						<li class="${typeCased == "Optional" ? "text-muted" : ""}">Mod ${dep.addOnId} removed (${typeCased})</li>
 					`;
 				}
 			};
