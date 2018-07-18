@@ -196,9 +196,6 @@ func requestFileData(addonID, fileID int) (FileData, error) {
 		return data, err
 	}
 
-	// TODO: dependencies?
-	// may need to do this per project and cannot cache it
-
 	// Add to cache
 	mainCache.cachedFilesMutex.Lock()
 	mainCache.CachedFiles[fileID] = data

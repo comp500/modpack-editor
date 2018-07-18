@@ -274,7 +274,21 @@ function renderModListContent() {
 				updateModList();
 			};
 
-			// TODO: check deps
+			let depMapping = (dep) => {
+				const typeCased = dep.type.charAt(0).toUpperCase() + dep.type.slice(1).toLowerCase();
+				if (currentModpack.Mods[dep.addOnId]) {
+					return hyperHTML.wire(dep)`
+						<li>${currentModpack.Mods[dep.addOnId].Name} (${typeCased})</li>
+					`;
+				} else {
+					return hyperHTML.wire(dep)`
+						<li>Mod ${dep.addOnId} removed (${typeCased})</li>
+					`;
+				}
+			};
+			let dependenciesList = currentModData.Dependencies ? currentModData.Dependencies.map(depMapping) : [];
+			let dependantsList = currentModData.Dependants ? currentModData.Dependants.map(depMapping) : [];
+
 			return hyperHTML.wire(currentModData)`
 				<li class="list-group-item flex-row justify-content-between d-flex">
 					<div class="d-flex">
@@ -285,7 +299,10 @@ function renderModListContent() {
 							<button type="button" class="btn btn-outline-secondary mx-1 btn-sm" onclick="${removeModCancel}">Cancel</button>
 						</div>
 					</div>
-					<p class="text-muted">No dependencies found</p>
+					<div>
+					${dependenciesList.length ? "Dependencies:" : ""}<ul class="list-unstyled">${dependenciesList}</ul>
+					${dependantsList.length ? "Dependants:" : ""}<ul class="list-unstyled">${dependantsList}</ul>
+					</div>
 				</li>
 			`;
 		}
